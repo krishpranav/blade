@@ -5,8 +5,8 @@ import { AppLayout } from "@/components/AppLayout";
 import { getTokenPairs } from "@/server/solana";
 import { ageFromMs, compact, fmtPct, fmtUsd, pctClass, shortAddr } from "@/lib/format";
 import { useWallet } from "@/lib/wallet";
-import { buildSwapTx, getQuote, SOL_MINT } from "@/lib/jupiter";
-import { ExternalLink, Copy, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
+import { buildSwapTx, getQuote, SOL_MINT, type JupiterQuote } from "@/lib/jupiter";
+import { ExternalLink, Copy, ArrowLeft, Loader2, CheckCircle2, X, ArrowDown } from "lucide-react";
 
 export const Route = createFileRoute("/token/$mint")({
   head: ({ params }) => ({
@@ -36,8 +36,11 @@ function TokenPage() {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("0.1");
   const [submitting, setSubmitting] = useState(false);
+  const [quoting, setQuoting] = useState(false);
+  const [pendingQuote, setPendingQuote] = useState<JupiterQuote | null>(null);
   const [txSig, setTxSig] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const SLIPPAGE_BPS = 100;
 
   if (isLoading) {
     return (
@@ -251,32 +254,25 @@ function TokenPage() {
                 </button>
               ) : (
                 <button
-                  disabled={submitting || side === "sell" || !parseFloat(amount)}
+                  disabled={quoting || submitting || side === "sell" || !parseFloat(amount)}
                   onClick={async () => {
                     setError(null);
                     setTxSig(null);
                     try {
-                      setSubmitting(true);
-                      // BUY: SOL -> token. Sell side disabled until we have user's SPL balance.
+                      setQuoting(true);
                       const lamports = Math.floor(parseFloat(amount) * 1e9);
                       if (lamports < 1000) throw new Error("Amount too small");
                       const quote = await getQuote({
                         inputMint: SOL_MINT,
                         outputMint: top.baseToken.address,
                         amount: String(lamports),
-                        slippageBps: 100,
+                        slippageBps: SLIPPAGE_BPS,
                       });
-                      const tx = await buildSwapTx({
-                        quote,
-                        userPublicKey: wallet.publicKey!,
-                      });
-                      const sig = await wallet.signAndSend(tx);
-                      setTxSig(sig);
-                      wallet.refreshBalance();
+                      setPendingQuote(quote);
                     } catch (e) {
-                      setError(e instanceof Error ? e.message : "Swap failed");
+                      setError(e instanceof Error ? e.message : "Quote failed");
                     } finally {
-                      setSubmitting(false);
+                      setQuoting(false);
                     }
                   }}
                   className={
@@ -284,9 +280,9 @@ function TokenPage() {
                     (side === "buy" ? "bg-bull text-background" : "bg-bear text-background")
                   }
                 >
-                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {quoting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {side === "buy"
-                    ? `Buy ${top.baseToken.symbol} via Jupiter`
+                    ? `Review buy ${top.baseToken.symbol}`
                     : `Sell (coming soon)`}
                 </button>
               )}
@@ -349,6 +345,42 @@ function TokenPage() {
         )}
       </div>
 
+      {pendingQuote && (
+        <ConfirmSwapModal
+          quote={pendingQuote}
+          tokenSymbol={top.baseToken.symbol}
+          tokenPriceUsd={price}
+          inputSymbol="SOL"
+          inputHumanAmount={parseFloat(amount)}
+          slippageBps={SLIPPAGE_BPS}
+          submitting={submitting}
+          error={error}
+          onCancel={() => {
+            if (submitting) return;
+            setPendingQuote(null);
+            setError(null);
+          }}
+          onConfirm={async () => {
+            setError(null);
+            try {
+              setSubmitting(true);
+              const tx = await buildSwapTx({
+                quote: pendingQuote,
+                userPublicKey: wallet.publicKey!,
+              });
+              const sig = await wallet.signAndSend(tx);
+              setTxSig(sig);
+              setPendingQuote(null);
+              wallet.refreshBalance();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Swap failed");
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+        />
+      )}
+
       {txSig && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 backdrop-blur-sm"
@@ -402,6 +434,177 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-mono">{value}</span>
+    </div>
+  );
+}
+
+function ConfirmSwapModal({
+  quote,
+  tokenSymbol,
+  tokenPriceUsd,
+  inputSymbol,
+  inputHumanAmount,
+  slippageBps,
+  submitting,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  quote: JupiterQuote;
+  tokenSymbol: string;
+  tokenPriceUsd: number | null;
+  inputSymbol: string;
+  inputHumanAmount: number;
+  slippageBps: number;
+  submitting: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const priceImpact = parseFloat(quote.priceImpactPct || "0");
+  const impactClass =
+    priceImpact >= 5 ? "text-bear" : priceImpact >= 1 ? "text-amber-400" : "text-bull";
+
+  // Estimated received in human units, derived from USD value (since we don't know decimals here)
+  // SOL ~ tokenPrice → received tokens ≈ (SOL_in * SOL_price_usd) / tokenPriceUsd
+  // Without SOL price we approximate: input USD ≈ inAmount lamports * 1e-9 * (tokenPriceUsd / outRatio)
+  // Simpler: outAmount/otherAmountThreshold gives min received raw — show ratio vs threshold.
+  const outAmount = BigInt(quote.outAmount);
+  const minOut = BigInt(quote.otherAmountThreshold);
+  // received human ≈ inputHumanAmount(SOL_USD) / tokenPriceUsd; we don't know SOL_USD in this scope.
+  // Use raw outAmount with compact formatting + show min received as % of outAmount.
+  const slippagePct = slippageBps / 100;
+
+  const route =
+    quote.routePlan?.map((r) => r.swapInfo.label).join(" → ") || "Direct";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+          <h3 className="font-display text-base font-semibold">Confirm swap</h3>
+          <button
+            onClick={onCancel}
+            disabled={submitting}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-50"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3 p-5">
+          {/* Visual: from / to */}
+          <div className="rounded-xl border border-border bg-surface-2/60 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              You pay
+            </div>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="font-mono text-2xl font-semibold">
+                {inputHumanAmount}
+              </span>
+              <span className="text-sm font-medium text-muted-foreground">
+                {inputSymbol}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <div className="rounded-full border border-border bg-surface-2 p-1.5">
+              <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-surface-2/60 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              You receive (estimated)
+            </div>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="font-mono text-2xl font-semibold">
+                {tokenPriceUsd && inputHumanAmount > 0
+                  ? compact((inputHumanAmount * 200) / tokenPriceUsd) // assumes ~$200 SOL fallback
+                  : compact(Number(outAmount))}
+              </span>
+              <span className="text-sm font-medium text-muted-foreground">
+                {tokenSymbol}
+              </span>
+            </div>
+            {tokenPriceUsd && (
+              <div className="mt-1 text-[11px] text-muted-foreground">
+                @ {fmtUsd(tokenPriceUsd)} per {tokenSymbol}
+              </div>
+            )}
+          </div>
+
+          {/* Details */}
+          <div className="space-y-1.5 rounded-lg border border-border bg-surface-2/40 p-3 text-[12px]">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Price impact</span>
+              <span className={"font-mono font-semibold " + impactClass}>
+                {priceImpact.toFixed(3)}%
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Max slippage</span>
+              <span className="font-mono">{slippagePct.toFixed(2)}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Min received</span>
+              <span className="font-mono">
+                {compact(Number(minOut))} {tokenSymbol}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-muted-foreground">Route</span>
+              <span className="truncate text-right font-mono text-[11px]">{route}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Aggregator</span>
+              <span className="font-mono">Jupiter v6</span>
+            </div>
+          </div>
+
+          {priceImpact >= 5 && (
+            <div className="rounded-md border border-bear/40 bg-bear/10 px-3 py-2 text-[11px] text-bear">
+              High price impact ({priceImpact.toFixed(2)}%). You may receive significantly less than expected.
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-md border border-bear/40 bg-bear/10 px-3 py-2 text-[11px] text-bear">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={onCancel}
+              disabled={submitting}
+              className="h-11 flex-1 rounded-lg border border-border bg-surface-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={submitting}
+              className="inline-flex h-11 flex-[1.4] items-center justify-center gap-2 rounded-lg bg-bull text-sm font-semibold text-background transition-transform hover:scale-[1.01] disabled:opacity-60"
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {submitting ? "Sign in Phantom…" : "Confirm & sign"}
+            </button>
+          </div>
+
+          <p className="text-center text-[10px] text-muted-foreground">
+            Phantom will prompt you to sign. Network fees apply.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
