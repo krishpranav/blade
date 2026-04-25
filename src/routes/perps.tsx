@@ -22,7 +22,8 @@ export const Route = createFileRoute("/perps")({
   component: Perps,
 });
 
-const MARKETS = [
+type Market = { sym: string; price: number; change: number };
+const MARKETS: Market[] = [
   { sym: "SOL-PERP", price: 178.42, change: 2.31 },
   { sym: "BTC-PERP", price: 71240, change: -0.84 },
   { sym: "ETH-PERP", price: 3640, change: 1.12 },
