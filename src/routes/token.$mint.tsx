@@ -254,32 +254,25 @@ function TokenPage() {
                 </button>
               ) : (
                 <button
-                  disabled={submitting || side === "sell" || !parseFloat(amount)}
+                  disabled={quoting || submitting || side === "sell" || !parseFloat(amount)}
                   onClick={async () => {
                     setError(null);
                     setTxSig(null);
                     try {
-                      setSubmitting(true);
-                      // BUY: SOL -> token. Sell side disabled until we have user's SPL balance.
+                      setQuoting(true);
                       const lamports = Math.floor(parseFloat(amount) * 1e9);
                       if (lamports < 1000) throw new Error("Amount too small");
                       const quote = await getQuote({
                         inputMint: SOL_MINT,
                         outputMint: top.baseToken.address,
                         amount: String(lamports),
-                        slippageBps: 100,
+                        slippageBps: SLIPPAGE_BPS,
                       });
-                      const tx = await buildSwapTx({
-                        quote,
-                        userPublicKey: wallet.publicKey!,
-                      });
-                      const sig = await wallet.signAndSend(tx);
-                      setTxSig(sig);
-                      wallet.refreshBalance();
+                      setPendingQuote(quote);
                     } catch (e) {
-                      setError(e instanceof Error ? e.message : "Swap failed");
+                      setError(e instanceof Error ? e.message : "Quote failed");
                     } finally {
-                      setSubmitting(false);
+                      setQuoting(false);
                     }
                   }}
                   className={
@@ -287,9 +280,9 @@ function TokenPage() {
                     (side === "buy" ? "bg-bull text-background" : "bg-bear text-background")
                   }
                 >
-                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {quoting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {side === "buy"
-                    ? `Buy ${top.baseToken.symbol} via Jupiter`
+                    ? `Review buy ${top.baseToken.symbol}`
                     : `Sell (coming soon)`}
                 </button>
               )}
