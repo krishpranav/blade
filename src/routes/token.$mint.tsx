@@ -36,8 +36,11 @@ function TokenPage() {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("0.1");
   const [submitting, setSubmitting] = useState(false);
+  const [quoting, setQuoting] = useState(false);
+  const [pendingQuote, setPendingQuote] = useState<JupiterQuote | null>(null);
   const [txSig, setTxSig] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const SLIPPAGE_BPS = 100;
 
   if (isLoading) {
     return (
