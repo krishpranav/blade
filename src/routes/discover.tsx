@@ -109,6 +109,30 @@ function Discover() {
           />
         </div>
 
+        <div className="mb-4 inline-flex items-center gap-1 rounded-lg border border-border bg-surface/40 p-1">
+          {([
+            { id: "trending", label: "Trending", icon: Flame },
+            { id: "memes", label: "Memes", icon: Coins },
+          ] as const).map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={
+                  "inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 text-[12px] font-semibold transition-colors " +
+                  (active
+                    ? "bg-violet-gradient text-primary-foreground shadow-glow"
+                    : "text-muted-foreground hover:text-foreground")
+                }
+              >
+                <t.icon className="h-3.5 w-3.5" />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="mb-4 flex flex-wrap gap-2">
           {FILTERS.map((f) => {
             const active = filter === f.id;
