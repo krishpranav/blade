@@ -5,8 +5,8 @@ import { AppLayout } from "@/components/AppLayout";
 import { getTokenPairs } from "@/server/solana";
 import { ageFromMs, compact, fmtPct, fmtUsd, pctClass, shortAddr } from "@/lib/format";
 import { useWallet } from "@/lib/wallet";
-import { buildSwapTx, getQuote, SOL_MINT } from "@/lib/jupiter";
-import { ExternalLink, Copy, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
+import { buildSwapTx, getQuote, SOL_MINT, type JupiterQuote } from "@/lib/jupiter";
+import { ExternalLink, Copy, ArrowLeft, Loader2, CheckCircle2, X, ArrowDown } from "lucide-react";
 
 export const Route = createFileRoute("/token/$mint")({
   head: ({ params }) => ({
