@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Logo } from "./Logo";
+import { WalletButton } from "./WalletButton";
 import { getMarketStats, searchTokens } from "@/server/solana";
 import { fmtUsd } from "@/lib/format";
 import { Search } from "lucide-react";
@@ -84,6 +85,8 @@ export function AppHeader() {
               {stats?.solUsd ? fmtUsd(stats.solUsd) : "—"}
             </span>
           </div>
+
+          <WalletButton />
         </div>
       </div>
 
