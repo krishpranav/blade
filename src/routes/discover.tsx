@@ -2,30 +2,35 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { getTrendingSolana, type DSPair } from "@/server/solana";
+import {
+  getTrendingSolana,
+  getMemecoinsSolana,
+  type DSPair,
+} from "@/server/solana";
 import { ageFromMs, compact, fmtPct, fmtUsd, pctClass } from "@/lib/format";
-import { Flame, Sparkles, Rocket, BarChart3 } from "lucide-react";
+import { Flame, Sparkles, Rocket, BarChart3, Coins } from "lucide-react";
 
 export const Route = createFileRoute("/discover")({
   head: () => ({
     meta: [
-      { title: "Discover — Trending Solana Tokens | Vertex" },
+      { title: "Discover — Trending Solana Tokens & Memes | Vertex" },
       {
         name: "description",
         content:
-          "Real-time trending Solana tokens with price, volume, liquidity, market cap and age. Filter by gainers, new launches, and top volume.",
+          "Real-time trending Solana tokens and memecoins with price, volume, liquidity, market cap and age.",
       },
       { property: "og:title", content: "Discover Solana tokens — Vertex" },
       {
         property: "og:description",
         content:
-          "Live trending Solana tokens, sortable by price change, volume, liquidity, and market cap.",
+          "Live trending Solana tokens & pump.fun memes, sortable by price change, volume, liquidity, and market cap.",
       },
     ],
   }),
   component: Discover,
 });
 
+type Tab = "trending" | "memes";
 type Filter = "trending" | "gainers" | "new" | "volume";
 
 const FILTERS: { id: Filter; label: string; icon: typeof Flame }[] = [
@@ -36,15 +41,26 @@ const FILTERS: { id: Filter; label: string; icon: typeof Flame }[] = [
 ];
 
 function Discover() {
+  const [tab, setTab] = useState<Tab>("trending");
   const [filter, setFilter] = useState<Filter>("trending");
   const [q, setQ] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const trendingQ = useQuery({
     queryKey: ["trending-solana"],
     queryFn: () => getTrendingSolana(),
     refetchInterval: 30_000,
     staleTime: 20_000,
   });
+  const memesQ = useQuery({
+    queryKey: ["memes-solana"],
+    queryFn: () => getMemecoinsSolana(),
+    refetchInterval: 25_000,
+    staleTime: 15_000,
+    enabled: tab === "memes",
+  });
+
+  const data = tab === "trending" ? trendingQ.data : memesQ.data;
+  const isLoading = tab === "trending" ? trendingQ.isLoading : memesQ.isLoading;
 
   const rows = useMemo(() => {
     let list: DSPair[] = data ?? [];
