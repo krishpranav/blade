@@ -349,7 +349,9 @@ function TokenPage() {
         <ConfirmSwapModal
           quote={pendingQuote}
           tokenSymbol={top.baseToken.symbol}
-          tokenDecimals={top.baseToken.address === SOL_MINT ? 9 : (top.info?.imageUrl ? 0 : 0) || 6}
+          tokenPriceUsd={price}
+          inputSymbol="SOL"
+          inputHumanAmount={parseFloat(amount)}
           slippageBps={SLIPPAGE_BPS}
           submitting={submitting}
           error={error}
