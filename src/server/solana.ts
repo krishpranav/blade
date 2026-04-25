@@ -48,6 +48,28 @@ export const getTrendingSolana = createServerFn({ method: "GET" }).handler(
   },
 );
 
+/** Trending Solana memecoins (volume-sorted, biased to pump.fun graduates) */
+export const getMemecoinsSolana = createServerFn({ method: "GET" }).handler(
+  async (): Promise<DSPair[]> => {
+    try {
+      const data = await dsFetch(`/latest/dex/search?q=pump`);
+      const pairs: DSPair[] = (data.pairs ?? []).filter(
+        (p: DSPair) =>
+          p.chainId === "solana" &&
+          (p.liquidity?.usd ?? 0) > 10_000 &&
+          p.baseToken?.symbol &&
+          p.baseToken.symbol !== "SOL" &&
+          p.baseToken.symbol !== "USDC",
+      );
+      pairs.sort((a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0));
+      return pairs.slice(0, 60);
+    } catch (e) {
+      console.error("getMemecoinsSolana failed", e);
+      return [];
+    }
+  },
+);
+
 /** Hydrate a list of token addresses into pair info */
 async function hydrateMints(mints: string[]): Promise<DSPair[]> {
   const list = mints.filter(Boolean).slice(0, 30);
