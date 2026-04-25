@@ -4,7 +4,9 @@ import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { getTokenPairs } from "@/server/solana";
 import { ageFromMs, compact, fmtPct, fmtUsd, pctClass, shortAddr } from "@/lib/format";
-import { ExternalLink, Copy, ArrowLeft } from "lucide-react";
+import { useWallet } from "@/lib/wallet";
+import { buildSwapTx, getQuote, SOL_MINT } from "@/lib/jupiter";
+import { ExternalLink, Copy, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/token/$mint")({
   head: ({ params }) => ({
@@ -30,9 +32,12 @@ function TokenPage() {
   });
 
   const top = data?.[0];
+  const wallet = useWallet();
   const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [amount, setAmount] = useState("0.5");
-  const [confirm, setConfirm] = useState(false);
+  const [amount, setAmount] = useState("0.1");
+  const [submitting, setSubmitting] = useState(false);
+  const [txSig, setTxSig] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   if (isLoading) {
     return (
