@@ -186,11 +186,18 @@ function TokenPage() {
               ))}
             </div>
 
-            <div className="space-y-4 p-4">
+            <div className="space-y-3 p-4">
               <div>
                 <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
                   <span>Amount ({side === "buy" ? "SOL" : top.baseToken.symbol})</span>
-                  <span>Balance: 0.00</span>
+                  <span>
+                    Balance:{" "}
+                    {wallet.publicKey
+                      ? side === "buy"
+                        ? (wallet.solBalance ?? 0).toFixed(3) + " SOL"
+                        : "—"
+                      : "—"}
+                  </span>
                 </div>
                 <input
                   value={amount}
@@ -216,26 +223,76 @@ function TokenPage() {
 
               <div className="space-y-1.5 rounded-lg border border-border bg-surface-2/60 p-3 text-[11px]">
                 <Row label="Slippage" value="1.0%" />
-                <Row label="Priority Fee" value="0.001 SOL" />
-                <Row label="Min received" value={
-                  price && parseFloat(amount) > 0
-                    ? compact((parseFloat(amount) * (price ? 1 / price : 0)) * 0.99) + " " + top.baseToken.symbol
-                    : "—"
-                } />
+                <Row label="Route" value="Jupiter v6 (best price)" />
+                <Row
+                  label="Est. received"
+                  value={
+                    price && parseFloat(amount) > 0
+                      ? compact(parseFloat(amount) * (price ? 1 / price : 0) * 0.99) +
+                        " " +
+                        top.baseToken.symbol
+                      : "—"
+                  }
+                />
               </div>
 
-              <button
-                onClick={() => setConfirm(true)}
-                className={
-                  "h-11 w-full rounded-lg text-sm font-semibold transition-transform hover:scale-[1.01] " +
-                  (side === "buy" ? "bg-bull text-background" : "bg-bear text-background")
-                }
-              >
-                {side === "buy" ? `Buy ${top.baseToken.symbol}` : `Sell ${top.baseToken.symbol}`}
-              </button>
+              {error && (
+                <div className="rounded-md border border-bear/40 bg-bear/10 px-3 py-2 text-[11px] text-bear">
+                  {error}
+                </div>
+              )}
+
+              {!wallet.publicKey ? (
+                <button
+                  onClick={() => wallet.connect()}
+                  className="h-11 w-full rounded-lg bg-violet-gradient text-sm font-semibold text-primary-foreground shadow-glow"
+                >
+                  Connect wallet to trade
+                </button>
+              ) : (
+                <button
+                  disabled={submitting || side === "sell" || !parseFloat(amount)}
+                  onClick={async () => {
+                    setError(null);
+                    setTxSig(null);
+                    try {
+                      setSubmitting(true);
+                      // BUY: SOL -> token. Sell side disabled until we have user's SPL balance.
+                      const lamports = Math.floor(parseFloat(amount) * 1e9);
+                      if (lamports < 1000) throw new Error("Amount too small");
+                      const quote = await getQuote({
+                        inputMint: SOL_MINT,
+                        outputMint: top.baseToken.address,
+                        amount: String(lamports),
+                        slippageBps: 100,
+                      });
+                      const tx = await buildSwapTx({
+                        quote,
+                        userPublicKey: wallet.publicKey!,
+                      });
+                      const sig = await wallet.signAndSend(tx);
+                      setTxSig(sig);
+                      wallet.refreshBalance();
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Swap failed");
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  className={
+                    "inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-transform hover:scale-[1.01] disabled:opacity-50 " +
+                    (side === "buy" ? "bg-bull text-background" : "bg-bear text-background")
+                  }
+                >
+                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {side === "buy"
+                    ? `Buy ${top.baseToken.symbol} via Jupiter`
+                    : `Sell (coming soon)`}
+                </button>
+              )}
 
               <p className="text-center text-[10px] text-muted-foreground">
-                Demo terminal — no real transactions are executed.
+                Real swaps signed in your Phantom wallet via Jupiter v6. You pay network fees.
               </p>
             </div>
 
@@ -292,29 +349,35 @@ function TokenPage() {
         )}
       </div>
 
-      {confirm && (
+      {txSig && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 backdrop-blur-sm"
-          onClick={() => setConfirm(false)}
+          onClick={() => setTxSig(null)}
         >
           <div
             className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-surface p-6 text-center shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-violet/20 text-violet">
-              ✓
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-bull/20 text-bull">
+              <CheckCircle2 className="h-6 w-6" />
             </div>
-            <h3 className="font-display text-xl font-semibold">Demo trade simulated</h3>
+            <h3 className="font-display text-xl font-semibold">Swap submitted</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              {side === "buy" ? "Buy" : "Sell"} {amount}{" "}
-              {side === "buy" ? "SOL" : top.baseToken.symbol} at {price ? fmtUsd(price) : "—"}.
-              Vertex doesn't execute real on-chain trades — this is a UI demo.
+              Bought {top.baseToken.symbol} with {amount} SOL via Jupiter.
             </p>
+            <a
+              href={`https://solscan.io/tx/${txSig}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-1 text-[12px] text-violet hover:underline"
+            >
+              View on Solscan <ExternalLink className="h-3 w-3" />
+            </a>
             <button
-              onClick={() => setConfirm(false)}
+              onClick={() => setTxSig(null)}
               className="mt-5 h-10 w-full rounded-lg bg-violet-gradient text-sm font-semibold text-primary-foreground"
             >
-              Got it
+              Done
             </button>
           </div>
         </div>
