@@ -1,6 +1,11 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute, HeadContent, Scripts, ClientOnly } from "@tanstack/react-router";
+import { lazy } from "react";
 
 import appCss from "../styles.css?url";
+
+const WalletProvider = lazy(() =>
+  import("@/lib/wallet").then((m) => ({ default: m.WalletProvider })),
+);
 
 function NotFoundComponent() {
   return (
@@ -74,5 +79,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  return <Outlet />;
+  return (
+    <ClientOnly fallback={<Outlet />}>
+      <WalletProvider>
+        <Outlet />
+      </WalletProvider>
+    </ClientOnly>
+  );
 }
