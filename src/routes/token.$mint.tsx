@@ -345,6 +345,40 @@ function TokenPage() {
         )}
       </div>
 
+      {pendingQuote && (
+        <ConfirmSwapModal
+          quote={pendingQuote}
+          tokenSymbol={top.baseToken.symbol}
+          tokenDecimals={top.baseToken.address === SOL_MINT ? 9 : (top.info?.imageUrl ? 0 : 0) || 6}
+          slippageBps={SLIPPAGE_BPS}
+          submitting={submitting}
+          error={error}
+          onCancel={() => {
+            if (submitting) return;
+            setPendingQuote(null);
+            setError(null);
+          }}
+          onConfirm={async () => {
+            setError(null);
+            try {
+              setSubmitting(true);
+              const tx = await buildSwapTx({
+                quote: pendingQuote,
+                userPublicKey: wallet.publicKey!,
+              });
+              const sig = await wallet.signAndSend(tx);
+              setTxSig(sig);
+              setPendingQuote(null);
+              wallet.refreshBalance();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Swap failed");
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+        />
+      )}
+
       {txSig && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 backdrop-blur-sm"
