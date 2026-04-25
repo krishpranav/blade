@@ -48,24 +48,91 @@ export const getTrendingSolana = createServerFn({ method: "GET" }).handler(
   },
 );
 
-/** Newly created Solana pairs — proxy for "Pulse" / new launches */
+/** Hydrate a list of token addresses into pair info */
+async function hydrateMints(mints: string[]): Promise<DSPair[]> {
+  const list = mints.filter(Boolean).slice(0, 30);
+  if (!list.length) return [];
+  // DexScreener tokens endpoint accepts up to 30 comma-separated
+  const r = await dsFetch(`/tokens/v1/solana/${list.join(",")}`);
+  return Array.isArray(r) ? (r as DSPair[]) : [];
+}
+
+/** Pump.fun-style "New" pulse: latest token profiles + boosts on Solana */
 export const getNewSolana = createServerFn({ method: "GET" }).handler(
   async (): Promise<DSPair[]> => {
     try {
-      const data = await dsFetch(`/token-profiles/latest/v1`);
-      const profiles = (Array.isArray(data) ? data : []).filter(
-        (p: any) => p.chainId === "solana",
-      );
-      const addresses = profiles.slice(0, 30).map((p: any) => p.tokenAddress).filter(Boolean);
-      if (!addresses.length) return [];
-      const detail = await dsFetch(`/tokens/v1/solana/${addresses.join(",")}`);
-      const pairs: DSPair[] = (Array.isArray(detail) ? detail : []).filter(
-        (p: DSPair) => p?.chainId === "solana",
-      );
+      const [profiles, boosts] = await Promise.all([
+        dsFetch(`/token-profiles/latest/v1`).catch(() => []),
+        dsFetch(`/token-boosts/latest/v1`).catch(() => []),
+      ]);
+      const seen = new Set<string>();
+      const mints: string[] = [];
+      for (const arr of [boosts, profiles]) {
+        for (const p of Array.isArray(arr) ? arr : []) {
+          if (p.chainId !== "solana") continue;
+          const a = p.tokenAddress as string;
+          if (!a || seen.has(a)) continue;
+          seen.add(a);
+          mints.push(a);
+          if (mints.length >= 30) break;
+        }
+        if (mints.length >= 30) break;
+      }
+      const pairs = await hydrateMints(mints);
       pairs.sort((a, b) => (b.pairCreatedAt ?? 0) - (a.pairCreatedAt ?? 0));
-      return pairs.slice(0, 40);
+      return pairs;
     } catch (e) {
       console.error("getNewSolana failed", e);
+      return [];
+    }
+  },
+);
+
+/** "Final Stretch" — boosted tokens nearing migration (still on pump-style AMM) */
+export const getFinalStretchSolana = createServerFn({ method: "GET" }).handler(
+  async (): Promise<DSPair[]> => {
+    try {
+      const boosts = await dsFetch(`/token-boosts/top/v1`).catch(() => []);
+      const mints = (Array.isArray(boosts) ? boosts : [])
+        .filter((b: any) => b.chainId === "solana")
+        .slice(0, 30)
+        .map((b: any) => b.tokenAddress as string)
+        .filter(Boolean);
+      const pairs = await hydrateMints(mints);
+      // Pump-stage: still on pumpswap/pump, decent liquidity but not migrated
+      const stretch = pairs.filter(
+        (p) =>
+          /pump/i.test(p.dexId) &&
+          (p.liquidity?.usd ?? 0) > 20_000 &&
+          (p.liquidity?.usd ?? 0) < 200_000,
+      );
+      stretch.sort((a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0));
+      return (stretch.length ? stretch : pairs).slice(0, 20);
+    } catch (e) {
+      console.error("getFinalStretchSolana failed", e);
+      return [];
+    }
+  },
+);
+
+/** "Migrated" — boosted tokens that graduated to Raydium/Meteora */
+export const getMigratedSolana = createServerFn({ method: "GET" }).handler(
+  async (): Promise<DSPair[]> => {
+    try {
+      const boosts = await dsFetch(`/token-boosts/top/v1`).catch(() => []);
+      const mints = (Array.isArray(boosts) ? boosts : [])
+        .filter((b: any) => b.chainId === "solana")
+        .slice(0, 30)
+        .map((b: any) => b.tokenAddress as string)
+        .filter(Boolean);
+      const pairs = await hydrateMints(mints);
+      const migrated = pairs.filter(
+        (p) => !/pump/i.test(p.dexId) && (p.liquidity?.usd ?? 0) > 50_000,
+      );
+      migrated.sort((a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0));
+      return (migrated.length ? migrated : pairs).slice(0, 20);
+    } catch (e) {
+      console.error("getMigratedSolana failed", e);
       return [];
     }
   },
