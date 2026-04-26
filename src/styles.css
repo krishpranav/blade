@@ -1,6 +1,5 @@
 @import "tailwindcss" source(none);
 @source "../src";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -45,62 +44,57 @@
 
 :root {
   --radius: 0.625rem;
+  --background: #171717;
+  --foreground: #e6e6e6;
+  --surface: #1f1f1f;
+  --surface-2: #2a2a2a;
 
-  /* Dark trading aesthetic — true near-black with violet/blue accents */
-  --background: oklch(0.13 0.01 260);
-  --foreground: oklch(0.98 0.005 260);
-  --surface: oklch(0.17 0.012 260);
-  --surface-2: oklch(0.21 0.014 260);
+  --card: #1c1c1c;
+  --card-foreground: #f5f5f5;
+  --popover: #111111;
+  --popover-foreground: #e6e6e6;
 
-  --card: oklch(0.16 0.012 260);
-  --card-foreground: oklch(0.98 0.005 260);
-  --popover: oklch(0.17 0.012 260);
-  --popover-foreground: oklch(0.98 0.005 260);
+  --primary: #f2d10a;
+  --primary-foreground: #111111;
+  --violet: #ff7324;
+  --violet-glow: #f9e3a3;
 
-  --primary: oklch(0.7 0.2 280);
-  --primary-foreground: oklch(0.13 0.01 260);
-  --violet: oklch(0.65 0.22 285);
-  --violet-glow: oklch(0.78 0.18 295);
+  --secondary: #232323;
+  --secondary-foreground: #e6e6e6;
 
-  --secondary: oklch(0.22 0.015 260);
-  --secondary-foreground: oklch(0.98 0.005 260);
+  --muted: #252525;
+  --muted-foreground: #a1a1aa;
 
-  --muted: oklch(0.2 0.012 260);
-  --muted-foreground: oklch(0.65 0.02 260);
+  --accent: #302712;
+  --accent-foreground: #f5f5f5;
 
-  --accent: oklch(0.25 0.05 280);
-  --accent-foreground: oklch(0.98 0.005 260);
+  --destructive: #f23546;
+  --destructive-foreground: #fff5f6;
 
-  --destructive: oklch(0.62 0.24 22);
-  --destructive-foreground: oklch(0.98 0.005 260);
+  --bull: #86efac;
+  --bear: #f87171;
 
-  --bull: oklch(0.78 0.2 145);
-  --bear: oklch(0.65 0.24 22);
+  --border: rgb(80 81 88 / 55%);
+  --input: rgb(80 81 88 / 75%);
+  --ring: #f4c20e;
 
-  --border: oklch(0.25 0.013 260 / 60%);
-  --input: oklch(0.25 0.013 260 / 80%);
-  --ring: oklch(0.7 0.2 280);
-
-  --chart-1: oklch(0.7 0.2 280);
-  --chart-2: oklch(0.78 0.2 145);
-  --chart-3: oklch(0.78 0.18 200);
-  --chart-4: oklch(0.78 0.18 60);
-  --chart-5: oklch(0.65 0.24 22);
+  --chart-1: #f2d10a;
+  --chart-2: #ff7324;
+  --chart-3: #36d8ff;
+  --chart-4: #86efac;
+  --chart-5: #f23546;
 
   --gradient-hero: radial-gradient(
       ellipse 80% 60% at 50% 0%,
-      oklch(0.4 0.18 285 / 0.35),
-      transparent 70%
+      rgb(242 209 10 / 14%),
+      transparent 65%
     ),
-    linear-gradient(180deg, oklch(0.13 0.01 260), oklch(0.1 0.01 260));
-  --gradient-violet: linear-gradient(
-    135deg,
-    oklch(0.65 0.22 285),
-    oklch(0.78 0.18 295)
-  );
-  --shadow-glow: 0 0 60px -10px oklch(0.7 0.2 285 / 0.45);
-  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.04) inset,
-    0 10px 30px -15px oklch(0 0 0 / 0.6);
+    radial-gradient(circle at 80% 10%, rgb(255 115 36 / 12%), transparent 26%),
+    linear-gradient(180deg, #171717 0%, #111111 100%);
+  --gradient-violet: linear-gradient(135deg, #f2d10a 0%, #ff7324 100%);
+  --shadow-glow: 0 0 70px -16px rgb(242 209 10 / 28%);
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset,
+    0 24px 60px -28px rgb(0 0 0 / 0.72);
 }
 
 @layer base {
@@ -113,6 +107,13 @@
     color: var(--color-foreground);
     font-family: var(--font-display);
     -webkit-font-smoothing: antialiased;
+    color-scheme: dark;
+  }
+  body {
+    min-height: 100vh;
+  }
+  #root {
+    min-height: 100vh;
   }
   .font-mono,
   .tabular {
@@ -149,10 +150,10 @@
   .grid-bg {
     background-image: linear-gradient(
         to right,
-        oklch(1 0 0 / 0.04) 1px,
+        rgb(255 255 255 / 0.03) 1px,
         transparent 1px
       ),
-      linear-gradient(to bottom, oklch(1 0 0 / 0.04) 1px, transparent 1px);
+      linear-gradient(to bottom, rgb(255 255 255 / 0.03) 1px, transparent 1px);
     background-size: 48px 48px;
   }
   .ticker {

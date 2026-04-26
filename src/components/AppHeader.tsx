@@ -48,18 +48,24 @@ export function AppHeader() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-6 px-4">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/84 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-6 px-4">
         <Link to="/" className="shrink-0">
           <Logo />
         </Link>
+        <div className="hidden rounded-full border border-border bg-surface/70 px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] text-muted-foreground xl:inline-flex">
+          Solana terminal
+        </div>
         <nav className="hidden items-center gap-1 md:flex">
           {navItems.map((item) => (
             <Link
               key={item.to}
               to={item.to}
               className="rounded-md px-3 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-              activeProps={{ className: "rounded-md px-3 py-1.5 text-[13px] font-medium bg-surface text-foreground" }}
+              activeProps={{
+                className:
+                  "rounded-md px-3 py-1.5 text-[13px] font-medium bg-surface text-foreground",
+              }}
             >
               {item.label}
             </Link>
@@ -69,10 +75,10 @@ export function AppHeader() {
         <div className="ml-auto flex items-center gap-3">
           <button
             onClick={() => setOpen(true)}
-            className="hidden h-9 items-center gap-2 rounded-md border border-border bg-surface/60 px-3 text-[13px] text-muted-foreground transition-colors hover:text-foreground sm:flex"
+            className="hidden h-10 items-center gap-2 rounded-md border border-border bg-surface/60 px-3 text-[13px] text-muted-foreground transition-colors hover:bg-surface hover:text-foreground sm:flex"
           >
             <Search className="h-3.5 w-3.5" />
-            <span>Search token or address</span>
+            <span>Search token or wallet</span>
             <kbd className="ml-6 rounded border border-border bg-background/80 px-1.5 py-[1px] font-mono text-[10px]">
               ⌘K
             </kbd>
@@ -96,7 +102,7 @@ export function AppHeader() {
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+            className="w-full max-w-xl overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
@@ -105,7 +111,7 @@ export function AppHeader() {
                 autoFocus
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search by symbol, name, or mint address…"
+                placeholder="Search by symbol, name, mint, or wallet…"
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
               <kbd className="rounded border border-border bg-background/80 px-1.5 py-[1px] font-mono text-[10px]">

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
@@ -8,22 +8,8 @@ import { useWallet } from "@/lib/wallet";
 import { buildSwapTx, getQuote, SOL_MINT, type JupiterQuote } from "@/lib/jupiter";
 import { ExternalLink, Copy, ArrowLeft, Loader2, CheckCircle2, X, ArrowDown } from "lucide-react";
 
-export const Route = createFileRoute("/token/$mint")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `Token ${params.mint.slice(0, 6)}… | Vertex` },
-      {
-        name: "description",
-        content: `Live price, chart, liquidity and trades for Solana token ${params.mint}.`,
-      },
-    ],
-  }),
-  component: TokenPage,
-});
-
-function TokenPage() {
-  const { mint } = Route.useParams();
-  const router = useRouter();
+export function TokenPage() {
+  const { mint } = useParams({ from: "/token/$mint" });
   const { data, isLoading } = useQuery({
     queryKey: ["token-pairs", mint],
     queryFn: () => getTokenPairs({ data: { mint } }),
@@ -82,7 +68,7 @@ function TokenPage() {
     <AppLayout>
       <div className="mx-auto max-w-[1600px] px-4 py-6">
         <button
-          onClick={() => router.history.back()}
+          onClick={() => window.history.back()}
           className="mb-4 inline-flex items-center gap-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back
@@ -119,9 +105,7 @@ function TokenPage() {
             </button>
           </div>
           <div className="ml-auto text-right">
-            <div className="font-mono text-2xl font-semibold">
-              {price ? fmtUsd(price) : "—"}
-            </div>
+            <div className="font-mono text-2xl font-semibold">{price ? fmtUsd(price) : "—"}</div>
             <div className={"font-mono text-sm " + pctClass(ch24)}>
               {fmtPct(ch24)} <span className="text-muted-foreground">24h</span>
             </div>
@@ -130,15 +114,15 @@ function TokenPage() {
 
         {/* Stats grid */}
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-6">
-          <Cell label="Liquidity" value={top.liquidity?.usd ? "$" + compact(top.liquidity.usd) : "—"} />
+          <Cell
+            label="Liquidity"
+            value={top.liquidity?.usd ? "$" + compact(top.liquidity.usd) : "—"}
+          />
           <Cell label="Volume 24h" value={top.volume?.h24 ? "$" + compact(top.volume.h24) : "—"} />
           <Cell label="Market Cap" value={top.marketCap ? "$" + compact(top.marketCap) : "—"} />
           <Cell label="FDV" value={top.fdv ? "$" + compact(top.fdv) : "—"} />
           <Cell label="Pair Age" value={ageFromMs(top.pairCreatedAt)} />
-          <Cell
-            label="Trades 24h"
-            value={total ? total.toLocaleString() : "—"}
-          />
+          <Cell label="Trades 24h" value={total ? total.toLocaleString() : "—"} />
         </div>
 
         {/* Chart + trade panel */}
@@ -146,7 +130,9 @@ function TokenPage() {
           <div className="flex h-[480px] flex-col overflow-hidden rounded-xl border border-border bg-surface/40 shadow-card">
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <div className="flex items-center gap-2 text-[12px]">
-                <span className="font-semibold">{top.baseToken.symbol}/{top.quoteToken.symbol}</span>
+                <span className="font-semibold">
+                  {top.baseToken.symbol}/{top.quoteToken.symbol}
+                </span>
                 <span className="text-muted-foreground">on {top.dexId}</span>
               </div>
               {top.url && (
@@ -281,9 +267,7 @@ function TokenPage() {
                   }
                 >
                   {quoting && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {side === "buy"
-                    ? `Review buy ${top.baseToken.symbol}`
-                    : `Sell (coming soon)`}
+                  {side === "buy" ? `Review buy ${top.baseToken.symbol}` : `Sell (coming soon)`}
                 </button>
               )}
 
@@ -296,7 +280,9 @@ function TokenPage() {
             <div className="border-t border-border p-4">
               <div className="mb-2 flex justify-between text-[11px] text-muted-foreground">
                 <span>Buy pressure 24h</span>
-                <span>{buys24.toLocaleString()} / {sells24.toLocaleString()}</span>
+                <span>
+                  {buys24.toLocaleString()} / {sells24.toLocaleString()}
+                </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-bear/30">
                 <div className="h-full bg-bull" style={{ width: buyPct + "%" }} />
@@ -323,7 +309,10 @@ function TokenPage() {
                 </thead>
                 <tbody>
                   {data.slice(1, 8).map((p) => (
-                    <tr key={p.pairAddress} className="border-t border-border/40 hover:bg-surface-2">
+                    <tr
+                      key={p.pairAddress}
+                      className="border-t border-border/40 hover:bg-surface-2"
+                    >
                       <td className="px-4 py-2.5">
                         {p.dexId} · {p.baseToken.symbol}/{p.quoteToken.symbol}
                       </td>
@@ -421,9 +410,7 @@ function TokenPage() {
 function Cell({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-surface/40 px-3 py-2.5">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="font-mono text-sm font-semibold">{value}</div>
     </div>
   );
@@ -475,8 +462,7 @@ function ConfirmSwapModal({
   // Use raw outAmount with compact formatting + show min received as % of outAmount.
   const slippagePct = slippageBps / 100;
 
-  const route =
-    quote.routePlan?.map((r) => r.swapInfo.label).join(" → ") || "Direct";
+  const route = quote.routePlan?.map((r) => r.swapInfo.label).join(" → ") || "Direct";
 
   return (
     <div
@@ -506,12 +492,8 @@ function ConfirmSwapModal({
               You pay
             </div>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="font-mono text-2xl font-semibold">
-                {inputHumanAmount}
-              </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                {inputSymbol}
-              </span>
+              <span className="font-mono text-2xl font-semibold">{inputHumanAmount}</span>
+              <span className="text-sm font-medium text-muted-foreground">{inputSymbol}</span>
             </div>
           </div>
 
@@ -531,9 +513,7 @@ function ConfirmSwapModal({
                   ? compact((inputHumanAmount * 200) / tokenPriceUsd) // assumes ~$200 SOL fallback
                   : compact(Number(outAmount))}
               </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                {tokenSymbol}
-              </span>
+              <span className="text-sm font-medium text-muted-foreground">{tokenSymbol}</span>
             </div>
             {tokenPriceUsd && (
               <div className="mt-1 text-[11px] text-muted-foreground">
@@ -572,7 +552,8 @@ function ConfirmSwapModal({
 
           {priceImpact >= 5 && (
             <div className="rounded-md border border-bear/40 bg-bear/10 px-3 py-2 text-[11px] text-bear">
-              High price impact ({priceImpact.toFixed(2)}%). You may receive significantly less than expected.
+              High price impact ({priceImpact.toFixed(2)}%). You may receive significantly less than
+              expected.
             </div>
           )}
 

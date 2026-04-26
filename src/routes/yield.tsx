@@ -1,25 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-
-export const Route = createFileRoute("/yield")({
-  head: () => ({
-    meta: [
-      { title: "Yield — Solana DeFi Opportunities | Vertex" },
-      {
-        name: "description",
-        content:
-          "Earn on idle SOL and stables across the best Solana yield protocols: Kamino, MarginFi, Jito, Marinade, and more.",
-      },
-      { property: "og:title", content: "Solana Yield Opportunities — Vertex" },
-      {
-        property: "og:description",
-        content: "Compare APYs across leading Solana yield protocols.",
-      },
-    ],
-  }),
-  component: Yield,
-});
 
 type Opp = {
   protocol: string;
@@ -31,24 +11,123 @@ type Opp = {
   color: string;
 };
 
+type RiskFilter = "All" | Opp["risk"];
+type TypeFilter = "All" | Opp["type"];
+
 const OPPS: Opp[] = [
-  { protocol: "Marinade", asset: "mSOL", apy: 7.21, tvl: 1_650_000_000, type: "LST", risk: "Low", color: "oklch(0.7 0.18 195)" },
-  { protocol: "Jito", asset: "JitoSOL", apy: 7.84, tvl: 2_100_000_000, type: "LST", risk: "Low", color: "oklch(0.78 0.2 145)" },
-  { protocol: "Kamino", asset: "USDC", apy: 12.45, tvl: 980_000_000, type: "Lending", risk: "Medium", color: "oklch(0.7 0.2 280)" },
-  { protocol: "Kamino", asset: "SOL", apy: 6.92, tvl: 720_000_000, type: "Lending", risk: "Low", color: "oklch(0.7 0.2 280)" },
-  { protocol: "MarginFi", asset: "USDC", apy: 9.31, tvl: 540_000_000, type: "Lending", risk: "Medium", color: "oklch(0.78 0.18 60)" },
-  { protocol: "MarginFi", asset: "SOL", apy: 5.84, tvl: 410_000_000, type: "Lending", risk: "Low", color: "oklch(0.78 0.18 60)" },
-  { protocol: "Drift", asset: "USDC", apy: 14.28, tvl: 320_000_000, type: "Lending", risk: "Medium", color: "oklch(0.65 0.22 310)" },
-  { protocol: "Sanctum", asset: "INF", apy: 8.45, tvl: 280_000_000, type: "LST", risk: "Low", color: "oklch(0.65 0.24 22)" },
-  { protocol: "Meteora", asset: "SOL/USDC", apy: 28.4, tvl: 180_000_000, type: "LP", risk: "High", color: "oklch(0.78 0.2 145)" },
-  { protocol: "Orca", asset: "SOL/USDC", apy: 22.1, tvl: 150_000_000, type: "LP", risk: "High", color: "oklch(0.7 0.18 195)" },
-  { protocol: "Raydium", asset: "SOL/USDT", apy: 19.6, tvl: 120_000_000, type: "LP", risk: "High", color: "oklch(0.65 0.22 285)" },
-  { protocol: "Lulo", asset: "USDC", apy: 11.2, tvl: 95_000_000, type: "Vault", risk: "Medium", color: "oklch(0.78 0.18 60)" },
+  {
+    protocol: "Marinade",
+    asset: "mSOL",
+    apy: 7.21,
+    tvl: 1_650_000_000,
+    type: "LST",
+    risk: "Low",
+    color: "oklch(0.7 0.18 195)",
+  },
+  {
+    protocol: "Jito",
+    asset: "JitoSOL",
+    apy: 7.84,
+    tvl: 2_100_000_000,
+    type: "LST",
+    risk: "Low",
+    color: "oklch(0.78 0.2 145)",
+  },
+  {
+    protocol: "Kamino",
+    asset: "USDC",
+    apy: 12.45,
+    tvl: 980_000_000,
+    type: "Lending",
+    risk: "Medium",
+    color: "oklch(0.7 0.2 280)",
+  },
+  {
+    protocol: "Kamino",
+    asset: "SOL",
+    apy: 6.92,
+    tvl: 720_000_000,
+    type: "Lending",
+    risk: "Low",
+    color: "oklch(0.7 0.2 280)",
+  },
+  {
+    protocol: "MarginFi",
+    asset: "USDC",
+    apy: 9.31,
+    tvl: 540_000_000,
+    type: "Lending",
+    risk: "Medium",
+    color: "oklch(0.78 0.18 60)",
+  },
+  {
+    protocol: "MarginFi",
+    asset: "SOL",
+    apy: 5.84,
+    tvl: 410_000_000,
+    type: "Lending",
+    risk: "Low",
+    color: "oklch(0.78 0.18 60)",
+  },
+  {
+    protocol: "Drift",
+    asset: "USDC",
+    apy: 14.28,
+    tvl: 320_000_000,
+    type: "Lending",
+    risk: "Medium",
+    color: "oklch(0.65 0.22 310)",
+  },
+  {
+    protocol: "Sanctum",
+    asset: "INF",
+    apy: 8.45,
+    tvl: 280_000_000,
+    type: "LST",
+    risk: "Low",
+    color: "oklch(0.65 0.24 22)",
+  },
+  {
+    protocol: "Meteora",
+    asset: "SOL/USDC",
+    apy: 28.4,
+    tvl: 180_000_000,
+    type: "LP",
+    risk: "High",
+    color: "oklch(0.78 0.2 145)",
+  },
+  {
+    protocol: "Orca",
+    asset: "SOL/USDC",
+    apy: 22.1,
+    tvl: 150_000_000,
+    type: "LP",
+    risk: "High",
+    color: "oklch(0.7 0.18 195)",
+  },
+  {
+    protocol: "Raydium",
+    asset: "SOL/USDT",
+    apy: 19.6,
+    tvl: 120_000_000,
+    type: "LP",
+    risk: "High",
+    color: "oklch(0.65 0.22 285)",
+  },
+  {
+    protocol: "Lulo",
+    asset: "USDC",
+    apy: 11.2,
+    tvl: 95_000_000,
+    type: "Vault",
+    risk: "Medium",
+    color: "oklch(0.78 0.18 60)",
+  },
 ];
 
-function Yield() {
-  const [risk, setRisk] = useState<"All" | Opp["risk"]>("All");
-  const [type, setType] = useState<"All" | Opp["type"]>("All");
+export function YieldPage() {
+  const [risk, setRisk] = useState<RiskFilter>("All");
+  const [type, setType] = useState<TypeFilter>("All");
 
   const list = OPPS.filter(
     (o) => (risk === "All" || o.risk === risk) && (type === "All" || o.type === type),
@@ -65,8 +144,18 @@ function Yield() {
         </div>
 
         <div className="mb-4 flex flex-wrap gap-3">
-          <Group label="Risk" options={["All", "Low", "Medium", "High"]} value={risk} onChange={(v) => setRisk(v as any)} />
-          <Group label="Type" options={["All", "Lending", "LST", "LP", "Vault"]} value={type} onChange={(v) => setType(v as any)} />
+          <Group
+            label="Risk"
+            options={["All", "Low", "Medium", "High"]}
+            value={risk}
+            onChange={(v) => setRisk(v as RiskFilter)}
+          />
+          <Group
+            label="Type"
+            options={["All", "Lending", "LST", "LP", "Vault"]}
+            value={type}
+            onChange={(v) => setType(v as TypeFilter)}
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -98,15 +187,21 @@ function Yield() {
               <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
                 <span>
                   TVL{" "}
-                  <span className="font-mono text-foreground">
-                    ${(o.tvl / 1e6).toFixed(0)}M
-                  </span>
+                  <span className="font-mono text-foreground">${(o.tvl / 1e6).toFixed(0)}M</span>
                 </span>
                 <span>
                   Risk{" "}
-                  <span className={
-                    o.risk === "Low" ? "text-bull" : o.risk === "Medium" ? "text-chart-4" : "text-bear"
-                  }>{o.risk}</span>
+                  <span
+                    className={
+                      o.risk === "Low"
+                        ? "text-bull"
+                        : o.risk === "Medium"
+                          ? "text-chart-4"
+                          : "text-bear"
+                    }
+                  >
+                    {o.risk}
+                  </span>
                 </span>
               </div>
               <button className="mt-4 h-9 w-full rounded-lg border border-border bg-surface-2 text-[12px] font-semibold transition-colors hover:bg-violet/15 hover:text-foreground">

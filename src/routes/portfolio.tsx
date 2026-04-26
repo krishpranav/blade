@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
@@ -6,26 +6,7 @@ import { getWalletHoldings, getTokensInfo } from "@/server/solana";
 import { compact, fmtUsd, shortAddr } from "@/lib/format";
 import { Wallet, Search } from "lucide-react";
 
-export const Route = createFileRoute("/portfolio")({
-  head: () => ({
-    meta: [
-      { title: "Portfolio Tracker | Vertex" },
-      {
-        name: "description",
-        content:
-          "Track any Solana wallet's holdings and USD value in real time — no connection required.",
-      },
-      { property: "og:title", content: "Solana Portfolio Tracker — Vertex" },
-      {
-        property: "og:description",
-        content: "Paste any Solana wallet to see its live holdings and USD value.",
-      },
-    ],
-  }),
-  component: Portfolio,
-});
-
-function Portfolio() {
+export function PortfolioPage() {
   const [input, setInput] = useState("");
   const [wallet, setWallet] = useState("");
 
@@ -56,8 +37,7 @@ function Portfolio() {
     }
   }
 
-  const SOL_PRICE =
-    (pairs ?? []).find((p) => p.baseToken.symbol === "SOL")?.priceUsd ?? null;
+  const SOL_PRICE = (pairs ?? []).find((p) => p.baseToken.symbol === "SOL")?.priceUsd ?? null;
 
   const enriched = (holdings?.tokens ?? [])
     .map((t) => {
@@ -140,7 +120,10 @@ function Portfolio() {
                 {/* Summary */}
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <Stat label="Total Value" value={fmtUsd(total)} big />
-                  <Stat label="SOL Balance" value={(holdings?.solBalance ?? 0).toFixed(4) + " SOL"} />
+                  <Stat
+                    label="SOL Balance"
+                    value={(holdings?.solBalance ?? 0).toFixed(4) + " SOL"}
+                  />
                   <Stat
                     label="SPL Tokens"
                     value={(holdings?.tokens?.length ?? 0).toLocaleString()}
@@ -163,7 +146,10 @@ function Portfolio() {
                       <tbody>
                         {isFetching && !holdings && (
                           <tr>
-                            <td colSpan={5} className="p-12 text-center text-sm text-muted-foreground">
+                            <td
+                              colSpan={5}
+                              className="p-12 text-center text-sm text-muted-foreground"
+                            >
                               Loading wallet…
                             </td>
                           </tr>
@@ -171,7 +157,10 @@ function Portfolio() {
                         {enriched.map((t) => {
                           const alloc = total > 0 ? (t.value / total) * 100 : 0;
                           return (
-                            <tr key={t.mint} className="border-t border-border/40 hover:bg-surface-2">
+                            <tr
+                              key={t.mint}
+                              className="border-t border-border/40 hover:bg-surface-2"
+                            >
                               <td className="px-4 py-3">
                                 <Link
                                   to="/token/$mint"
@@ -226,7 +215,10 @@ function Portfolio() {
                         })}
                         {!isFetching && enriched.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="p-12 text-center text-sm text-muted-foreground">
+                            <td
+                              colSpan={5}
+                              className="p-12 text-center text-sm text-muted-foreground"
+                            >
                               No SPL tokens with price data.
                             </td>
                           </tr>
@@ -247,9 +239,7 @@ function Portfolio() {
 function Stat({ label, value, big }: { label: string; value: string; big?: boolean }) {
   return (
     <div className="rounded-xl border border-border bg-surface/40 p-4 shadow-card">
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={"mt-1 font-mono font-semibold " + (big ? "text-2xl" : "text-lg")}>
         {value}
       </div>

@@ -1,26 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/AppLayout";
+import { useState, useMemo } from "react";
 import { compact, fmtUsd, pctClass, fmtPct } from "@/lib/format";
-
-export const Route = createFileRoute("/perps")({
-  head: () => ({
-    meta: [
-      { title: "Perpetuals — Coming Soon | Vertex" },
-      {
-        name: "description",
-        content:
-          "Trade leveraged Solana perpetuals from the Vertex terminal. Cross-margin, deep liquidity, sub-second fills. Coming soon.",
-      },
-      { property: "og:title", content: "Vertex Perpetuals — Coming Soon" },
-      {
-        property: "og:description",
-        content: "Leveraged Solana perpetuals from the Vertex terminal. Coming soon.",
-      },
-    ],
-  }),
-  component: Perps,
-});
 
 type Market = { sym: string; price: number; change: number };
 const MARKETS: Market[] = [
@@ -33,7 +13,7 @@ const MARKETS: Market[] = [
   { sym: "BONK-PERP", price: 0.0000234, change: 8.4 },
 ] as const;
 
-function Perps() {
+export function PerpsPage() {
   const [market, setMarket] = useState(MARKETS[0]);
   const [side, setSide] = useState<"long" | "short">("long");
   const [lev, setLev] = useState(10);
@@ -132,16 +112,19 @@ function Perps() {
               <div className="bg-surface/40 px-2 py-1 text-right text-muted-foreground">Size</div>
             </div>
             <div className="font-mono text-[11px]">
-              {orderbook.asks.slice().reverse().map((r, i) => (
-                <div key={"a" + i} className="relative grid grid-cols-2 px-2 py-[3px]">
-                  <div
-                    className="absolute inset-y-0 right-0 bg-bear/15"
-                    style={{ width: Math.min(r.size * 1.5, 100) + "%" }}
-                  />
-                  <span className="relative text-bear">{fmtUsd(r.price)}</span>
-                  <span className="relative text-right">{r.size.toFixed(2)}</span>
-                </div>
-              ))}
+              {orderbook.asks
+                .slice()
+                .reverse()
+                .map((r, i) => (
+                  <div key={"a" + i} className="relative grid grid-cols-2 px-2 py-[3px]">
+                    <div
+                      className="absolute inset-y-0 right-0 bg-bear/15"
+                      style={{ width: Math.min(r.size * 1.5, 100) + "%" }}
+                    />
+                    <span className="relative text-bear">{fmtUsd(r.price)}</span>
+                    <span className="relative text-right">{r.size.toFixed(2)}</span>
+                  </div>
+                ))}
               <div className="border-y border-border px-2 py-1.5 text-center text-foreground">
                 {fmtUsd(orderbook.mid)}{" "}
                 <span className="text-[10px] text-muted-foreground">mid</span>
@@ -210,9 +193,15 @@ function Perps() {
               </div>
               <div className="space-y-1.5 rounded-lg border border-border bg-surface-2/60 p-3 text-[11px]">
                 <Row label="Entry" value={fmtUsd(market.price)} />
-                <Row label="Liq. price" value={fmtUsd(market.price * (side === "long" ? 1 - 1 / lev : 1 + 1 / lev))} />
+                <Row
+                  label="Liq. price"
+                  value={fmtUsd(market.price * (side === "long" ? 1 - 1 / lev : 1 + 1 / lev))}
+                />
                 <Row label="Notional" value={"$" + compact(parseFloat(size || "0") * lev)} />
-                <Row label="Fee" value={"$" + (parseFloat(size || "0") * lev * 0.0006).toFixed(2)} />
+                <Row
+                  label="Fee"
+                  value={"$" + (parseFloat(size || "0") * lev * 0.0006).toFixed(2)}
+                />
               </div>
               <button
                 disabled

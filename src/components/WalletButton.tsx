@@ -1,17 +1,22 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@/lib/wallet";
+import { getMarketStats } from "@/server/solana";
 import { fmtUsd, shortAddr } from "@/lib/format";
 import { Wallet, Copy, LogOut, ExternalLink, ChevronDown } from "lucide-react";
 
 export function WalletButton() {
-  const { ready, publicKey, solBalance, connecting, connect, disconnect } =
-    useWallet();
+  const { ready, publicKey, solBalance, connecting, connect, disconnect } = useWallet();
   const [open, setOpen] = useState(false);
+  const { data: stats } = useQuery({
+    queryKey: ["wallet-market-stats"],
+    queryFn: () => getMarketStats(),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
 
   if (!ready) {
-    return (
-      <div className="h-9 w-28 animate-pulse rounded-md bg-surface/60" />
-    );
+    return <div className="h-9 w-28 animate-pulse rounded-md bg-surface/60" />;
   }
 
   if (!publicKey) {
@@ -48,26 +53,19 @@ export function WalletButton() {
 
       {open && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setOpen(false)}
-          />
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
             <div className="border-b border-border bg-surface-2/40 p-4">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Phantom Wallet
               </div>
-              <div className="mt-1 font-mono text-[12px]">
-                {shortAddr(publicKey, 6)}
-              </div>
+              <div className="mt-1 font-mono text-[12px]">{shortAddr(publicKey, 6)}</div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className="font-display text-2xl font-semibold">
-                  {sol.toFixed(4)}
-                </span>
+                <span className="font-display text-2xl font-semibold">{sol.toFixed(4)}</span>
                 <span className="text-sm text-muted-foreground">SOL</span>
               </div>
               <div className="text-[11px] text-muted-foreground">
-                ≈ {fmtUsd(sol * 200)} {/* rough placeholder; live SOL price is in header */}
+                ≈ {fmtUsd(sol * (stats?.solUsd ?? 0))}
               </div>
             </div>
             <div className="p-2">

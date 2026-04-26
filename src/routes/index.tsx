@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { getTrendingSolana, getMarketStats } from "@/server/solana";
@@ -14,27 +14,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Vertex — The Gateway to Solana DeFi" },
-      {
-        name: "description",
-        content:
-          "The fastest trading terminal for Solana. Discover trending tokens, snipe new launches, track wallets, trade perps, and earn yield.",
-      },
-      { property: "og:title", content: "Vertex — The Gateway to Solana DeFi" },
-      {
-        property: "og:description",
-        content:
-          "Trade Solana with a single, ultra-fast terminal. Real-time market data, wallet tracking, and yield in one place.",
-      },
-    ],
-  }),
-  component: Landing,
-});
-
-function Landing() {
+export function HomePage() {
   const { data: trending } = useQuery({
     queryKey: ["trending-solana"],
     queryFn: () => getTrendingSolana(),
@@ -61,12 +41,11 @@ function Landing() {
             Live on Solana mainnet
           </div>
           <h1 className="font-display text-5xl font-semibold leading-[1.05] tracking-tight md:text-7xl">
-            The Gateway to{" "}
-            <span className="text-violet-gradient">Solana DeFi</span>
+            The Gateway to <span className="text-violet-gradient">Solana DeFi</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base text-muted-foreground md:text-lg">
-            Vertex is the only trading terminal you'll ever need. Real-time data,
-            sub-block execution, and every Solana market in one screen.
+            Blade is a fast, operator-first terminal for Solana. Live discovery, wallet
+            intelligence, and execution flows without the toy-dashboard feel.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -143,8 +122,8 @@ function Landing() {
             Every edge, in one terminal
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-            From wallet tracking to real-time analytics — Vertex puts every
-            advantage at your fingertips.
+            From wallet tracking to real-time analytics — Blade puts every advantage at your
+            fingertips.
           </p>
         </div>
 
@@ -190,11 +169,17 @@ function Landing() {
       {/* Footer */}
       <footer className="border-t border-border py-10">
         <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-3 px-4 text-[12px] text-muted-foreground md:flex-row">
-          <div>© 2025 Vertex. Demo project — not financial advice.</div>
+          <div>© 2026 Blade. Market intelligence interface — not financial advice.</div>
           <div className="flex gap-4">
-            <Link to="/discover" className="hover:text-foreground">Discover</Link>
-            <Link to="/pulse" className="hover:text-foreground">Pulse</Link>
-            <Link to="/yield" className="hover:text-foreground">Yield</Link>
+            <Link to="/discover" className="hover:text-foreground">
+              Discover
+            </Link>
+            <Link to="/pulse" className="hover:text-foreground">
+              Pulse
+            </Link>
+            <Link to="/yield" className="hover:text-foreground">
+              Yield
+            </Link>
           </div>
         </div>
       </footer>

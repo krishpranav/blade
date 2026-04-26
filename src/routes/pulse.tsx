@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import {
@@ -11,27 +11,7 @@ import { ageFromMs, compact, fmtPct, fmtUsd, pctClass } from "@/lib/format";
 import { Rocket, Zap, CheckCircle2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export const Route = createFileRoute("/pulse")({
-  head: () => ({
-    meta: [
-      { title: "Pulse — Live Solana Token Launches | Vertex" },
-      {
-        name: "description",
-        content:
-          "Live feed of newly launched Solana tokens, final-stretch pumps, and migrated graduates. Real-time pump.fun-style discovery.",
-      },
-      { property: "og:title", content: "Pulse — Live Solana launches" },
-      {
-        property: "og:description",
-        content:
-          "Three-column live feed: new launches, about-to-migrate, and graduated tokens.",
-      },
-    ],
-  }),
-  component: Pulse,
-});
-
-function Pulse() {
+export function PulsePage() {
   const newQ = useQuery({
     queryKey: ["pulse-new"],
     queryFn: () => getNewSolana(),
@@ -56,17 +36,13 @@ function Pulse() {
       <div className="mx-auto max-w-[1600px] px-4 py-5">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <h1 className="font-display text-xl font-semibold tracking-tight">
-              Pulse
-            </h1>
+            <h1 className="font-display text-xl font-semibold tracking-tight">Pulse</h1>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-2.5 py-0.5 text-[11px] text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-bull pulse-dot" />
               Live · pump.fun & DexScreener
             </span>
           </div>
-          <div className="text-[11px] text-muted-foreground">
-            Auto-refresh 12–20s
-          </div>
+          <div className="text-[11px] text-muted-foreground">Auto-refresh 12–20s</div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -135,15 +111,10 @@ function Column({
       <div className="max-h-[calc(100vh-220px)] overflow-y-auto">
         {loading &&
           Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="m-2 h-16 animate-pulse rounded-md bg-surface-2/60"
-            />
+            <div key={i} className="m-2 h-16 animate-pulse rounded-md bg-surface-2/60" />
           ))}
         {!loading && rows.length === 0 && (
-          <div className="px-4 py-12 text-center text-xs text-muted-foreground">
-            No tokens.
-          </div>
+          <div className="px-4 py-12 text-center text-xs text-muted-foreground">No tokens.</div>
         )}
         {rows.map((p) => (
           <PulseRow key={p.pairAddress} p={p} />
@@ -190,9 +161,7 @@ function PulseRow({ p }: { p: DSPair }) {
             <span className="font-mono text-[12px]">
               {p.priceUsd ? fmtUsd(parseFloat(p.priceUsd)) : "—"}
             </span>
-            <span className={"font-mono text-[11px] " + pctClass(ch)}>
-              {fmtPct(ch)}
-            </span>
+            <span className={"font-mono text-[11px] " + pctClass(ch)}>{fmtPct(ch)}</span>
           </div>
           <div className="mt-1 grid grid-cols-3 gap-1 text-[10px] text-muted-foreground">
             <Stat label="V" value={p.volume?.h24 ? "$" + compact(p.volume.h24) : "—"} />

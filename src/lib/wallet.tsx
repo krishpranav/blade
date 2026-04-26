@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import {
   createContext,
   useCallback,
@@ -15,9 +17,7 @@ type PhantomProvider = {
   isConnected: boolean;
   connect: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: { toString(): string } }>;
   disconnect: () => Promise<void>;
-  signAndSendTransaction: (
-    tx: VersionedTransaction,
-  ) => Promise<{ signature: string }>;
+  signAndSendTransaction: (tx: VersionedTransaction) => Promise<{ signature: string }>;
   on: (event: string, cb: (...args: unknown[]) => void) => void;
   removeListener?: (event: string, cb: (...args: unknown[]) => void) => void;
 };
@@ -58,10 +58,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [connecting, setConnecting] = useState(false);
   const [ready, setReady] = useState(false);
 
-  const connection = useMemo(
-    () => new Connection(RPC_URL, "confirmed"),
-    [],
-  );
+  const connection = useMemo(() => new Connection(RPC_URL, "confirmed"), []);
 
   const refreshBalance = useCallback(async () => {
     if (!publicKey) {

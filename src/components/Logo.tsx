@@ -10,19 +10,24 @@ export function Logo({ className = "" }: { className?: string }) {
         aria-hidden
       >
         <defs>
-          <linearGradient id="vg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#A78BFA" />
-            <stop offset="1" stopColor="#7C3AED" />
+          <linearGradient
+            id="blade-mark"
+            x1="0"
+            y1="0"
+            x2="32"
+            y2="32"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#F2D10A" />
+            <stop offset="1" stopColor="#FF7324" />
           </linearGradient>
         </defs>
-        <path d="M16 3 L29 28 L3 28 Z" fill="url(#vg)" />
-        <path d="M16 11 L23 25 L9 25 Z" fill="oklch(0.13 0.01 260)" />
+        <path d="M6 5h20l-8 10 8 12H6l8-12Z" fill="url(#blade-mark)" />
+        <path d="M13 11h9l-4 5 4 6h-9l4-6Z" fill="#111111" />
       </svg>
-      <span className="font-display text-[15px] font-semibold tracking-tight">
-        VERTEX
-      </span>
-      <span className="rounded-md bg-violet/15 px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.78_0.18_295)]">
-        Pro
+      <span className="font-display text-[15px] font-semibold tracking-tight">BLADE</span>
+      <span className="rounded-md border border-border bg-accent px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
+        Live
       </span>
     </div>
   );

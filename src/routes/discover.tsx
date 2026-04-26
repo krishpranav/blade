@@ -1,34 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import {
-  getTrendingSolana,
-  getMemecoinsSolana,
-  type DSPair,
-} from "@/server/solana";
+import { getTrendingSolana, getMemecoinsSolana, type DSPair } from "@/server/solana";
 import { ageFromMs, compact, fmtPct, fmtUsd, pctClass } from "@/lib/format";
 import { Flame, Sparkles, Rocket, BarChart3, Coins } from "lucide-react";
-
-export const Route = createFileRoute("/discover")({
-  head: () => ({
-    meta: [
-      { title: "Discover — Trending Solana Tokens & Memes | Vertex" },
-      {
-        name: "description",
-        content:
-          "Real-time trending Solana tokens and memecoins with price, volume, liquidity, market cap and age.",
-      },
-      { property: "og:title", content: "Discover Solana tokens — Vertex" },
-      {
-        property: "og:description",
-        content:
-          "Live trending Solana tokens & pump.fun memes, sortable by price change, volume, liquidity, and market cap.",
-      },
-    ],
-  }),
-  component: Discover,
-});
 
 type Tab = "trending" | "memes";
 type Filter = "trending" | "gainers" | "new" | "volume";
@@ -40,7 +16,7 @@ const FILTERS: { id: Filter; label: string; icon: typeof Flame }[] = [
   { id: "volume", label: "High Volume", icon: BarChart3 },
 ];
 
-function Discover() {
+export function DiscoverPage() {
   const [tab, setTab] = useState<Tab>("trending");
   const [filter, setFilter] = useState<Filter>("trending");
   const [q, setQ] = useState("");
@@ -74,17 +50,11 @@ function Discover() {
       );
     }
     if (filter === "gainers") {
-      list = [...list].sort(
-        (a, b) => (b.priceChange?.h24 ?? 0) - (a.priceChange?.h24 ?? 0),
-      );
+      list = [...list].sort((a, b) => (b.priceChange?.h24 ?? 0) - (a.priceChange?.h24 ?? 0));
     } else if (filter === "new") {
-      list = [...list].sort(
-        (a, b) => (b.pairCreatedAt ?? 0) - (a.pairCreatedAt ?? 0),
-      );
+      list = [...list].sort((a, b) => (b.pairCreatedAt ?? 0) - (a.pairCreatedAt ?? 0));
     } else if (filter === "volume") {
-      list = [...list].sort(
-        (a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0),
-      );
+      list = [...list].sort((a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0));
     }
     return list;
   }, [data, q, filter]);
@@ -94,9 +64,7 @@ function Discover() {
       <div className="mx-auto max-w-[1600px] px-4 py-6">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight">
-              Discover
-            </h1>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">Discover</h1>
             <p className="text-sm text-muted-foreground">
               Live Solana markets, sorted by activity. Refreshes every 30s.
             </p>
@@ -110,10 +78,12 @@ function Discover() {
         </div>
 
         <div className="mb-4 inline-flex items-center gap-1 rounded-lg border border-border bg-surface/40 p-1">
-          {([
-            { id: "trending", label: "Trending", icon: Flame },
-            { id: "memes", label: "Memes", icon: Coins },
-          ] as const).map((t) => {
+          {(
+            [
+              { id: "trending", label: "Trending", icon: Flame },
+              { id: "memes", label: "Memes", icon: Coins },
+            ] as const
+          ).map((t) => {
             const active = tab === t.id;
             return (
               <button
@@ -233,7 +203,11 @@ function Discover() {
                         {p.liquidity?.usd ? "$" + compact(p.liquidity.usd) : "—"}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        {p.marketCap ? "$" + compact(p.marketCap) : p.fdv ? "$" + compact(p.fdv) : "—"}
+                        {p.marketCap
+                          ? "$" + compact(p.marketCap)
+                          : p.fdv
+                            ? "$" + compact(p.fdv)
+                            : "—"}
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-muted-foreground">
                         {ageFromMs(p.pairCreatedAt)}
@@ -243,7 +217,10 @@ function Discover() {
                 })}
                 {!isLoading && rows.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    <td
+                      colSpan={8}
+                      className="px-4 py-12 text-center text-sm text-muted-foreground"
+                    >
                       No tokens match your filter.
                     </td>
                   </tr>
