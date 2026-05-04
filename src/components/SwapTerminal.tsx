@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowDownUp, Settings, Zap, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowDownUp, Settings, Zap, CheckCircle2, Loader2, ShieldCheck, Flame } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { fmtUsd } from "@/lib/format";
 
@@ -9,6 +9,9 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
   const [amount, setAmount] = useState<string>("");
   const [slippage, setSlippage] = useState<number>(1.0);
   const [priorityFee, setPriorityFee] = useState<number>(0.001);
+  const [jitoTip, setJitoTip] = useState<number>(0.005);
+  const [antiMev, setAntiMev] = useState<boolean>(true);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   // Fetch mock quote from Rust backend
   const { data: quote, isLoading: isQuoting } = useQuery({
@@ -61,7 +64,10 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
           <Zap className="h-5 w-5 text-violet" />
           Sniper Terminal
         </h3>
-        <button className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground">
+        <button 
+          onClick={() => setShowSettings(!showSettings)}
+          className={`rounded-md p-2 transition-colors ${showSettings ? "bg-violet/20 text-violet" : "text-muted-foreground hover:bg-surface hover:text-foreground"}`}
+        >
           <Settings className="h-4 w-4" />
         </button>
       </div>
@@ -147,6 +153,60 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
         </div>
       )}
 
+      {/* Advanced Settings Panel */}
+      {showSettings && (
+        <div className="mt-3 space-y-3 rounded-xl border border-border/40 bg-surface/30 p-4">
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Max Slippage</span>
+              <span className="font-mono text-violet">{slippage}%</span>
+            </div>
+            <div className="flex gap-2">
+              {[0.5, 1.0, 2.5, 5.0].map((val) => (
+                <button
+                  key={val}
+                  onClick={() => setSlippage(val)}
+                  className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-colors ${slippage === val ? "bg-violet text-white" : "bg-surface-2 text-muted-foreground hover:bg-surface"}`}
+                >
+                  {val}%
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="space-y-2 pt-2 border-t border-border/20">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><Flame className="h-3 w-3 text-amber-500" /> Jito MEV Tip</span>
+              <span className="font-mono text-amber-500">{jitoTip} SOL</span>
+            </div>
+            <div className="flex gap-2">
+              {[0.001, 0.005, 0.01].map((val) => (
+                <button
+                  key={val}
+                  onClick={() => setJitoTip(val)}
+                  className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-colors ${jitoTip === val ? "bg-amber-500/20 text-amber-500 border border-amber-500/50" : "bg-surface-2 text-muted-foreground hover:bg-surface"}`}
+                >
+                  {val}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-border/20 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <ShieldCheck className={`h-4 w-4 ${antiMev ? "text-bull" : ""}`} />
+              Anti-MEV Protection
+            </div>
+            <button 
+              onClick={() => setAntiMev(!antiMev)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${antiMev ? "bg-bull" : "bg-surface-2"}`}
+            >
+              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${antiMev ? "translate-x-5" : "translate-x-1"}`} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Execute Button */}
       <button
         onClick={() => swapMutation.mutate()}
@@ -166,14 +226,14 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
         )}
       </button>
 
-      {/* Settings Row */}
+      {/* Footer Info Row */}
       <div className="mt-4 flex items-center justify-between text-[11px] font-medium text-muted-foreground">
         <div className="flex gap-4">
-          <span className="flex items-center gap-1 cursor-pointer hover:text-foreground">
-            Slippage: <span className="text-violet">{slippage}%</span>
+          <span className="flex items-center gap-1">
+            <ShieldCheck className="h-3 w-3 text-bull" /> MEV Protected
           </span>
-          <span className="flex items-center gap-1 cursor-pointer hover:text-foreground">
-            Priority: <span className="text-violet">{priorityFee} SOL</span>
+          <span className="flex items-center gap-1">
+            <Flame className="h-3 w-3 text-amber-500" /> Jito +{jitoTip}
           </span>
         </div>
         <span className="flex items-center gap-1 text-bull">
