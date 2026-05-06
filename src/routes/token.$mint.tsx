@@ -8,6 +8,7 @@ import { ExternalLink, Copy, ArrowLeft } from "lucide-react";
 import { SwapTerminal } from "@/components/SwapTerminal";
 import { TradeHistory } from "@/components/TradeHistory";
 import { WalletHoldings } from "@/components/WalletHoldings";
+import { TokenSecurityPanel } from "@/components/TokenSecurityPanel";
 
 export function TokenPage() {
   const { mint } = useParams({ from: "/token/$mint" });
@@ -162,7 +163,7 @@ export function TokenPage() {
             </div>
           </div>
 
-          {/* Right Column: SwapTerminal + Wallet */}
+          {/* Right Column: SwapTerminal + Wallet + Security */}
           <div className="flex flex-col gap-3">
             <SwapTerminal defaultInput="SOL" defaultOutput={top.baseToken.symbol} />
             
@@ -170,6 +171,8 @@ export function TokenPage() {
               tokenSymbol={top.baseToken.symbol} 
               currentPriceUsd={price || 0} 
             />
+
+            <TokenSecurityPanel tokenSymbol={top.baseToken.symbol} />
             
             {/* Buy/sell pressure compact widget */}
             <div className="rounded-xl border border-border bg-surface/40 p-4 shadow-card">
