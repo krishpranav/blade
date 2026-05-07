@@ -7,6 +7,7 @@ import { ageFromMs, compact, fmtPct, fmtUsd, pctClass, shortAddr } from "@/lib/f
 import { ExternalLink, Copy, ArrowLeft } from "lucide-react";
 import { SwapTerminal } from "@/components/SwapTerminal";
 import { TradeHistory } from "@/components/TradeHistory";
+import { SmartMoneyPanel } from "@/components/SmartMoneyPanel";
 import { WalletHoldings } from "@/components/WalletHoldings";
 import { TokenSecurityPanel } from "@/components/TokenSecurityPanel";
 
@@ -158,8 +159,13 @@ export function TokenPage() {
               />
             </div>
             
-            <div className="flex h-[380px] flex-col overflow-hidden rounded-xl shadow-card">
-              <TradeHistory currentPriceUsd={price || 0.005} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex h-[380px] flex-col overflow-hidden rounded-xl shadow-card">
+                <TradeHistory currentPriceUsd={price || 0.005} />
+              </div>
+              <div className="flex h-[380px] flex-col overflow-hidden rounded-xl shadow-card">
+                <SmartMoneyPanel />
+              </div>
             </div>
           </div>
 

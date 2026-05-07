@@ -12,6 +12,8 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
   const [jitoTip, setJitoTip] = useState<number>(0.005);
   const [antiMev, setAntiMev] = useState<boolean>(true);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<"snipe" | "limit" | "dca">("snipe");
+  const [limitPrice, setLimitPrice] = useState<string>("");
 
   // Fetch mock quote from Rust backend
   const { data: quote, isLoading: isQuoting } = useQuery({
@@ -62,7 +64,7 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-display flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
           <Zap className="h-5 w-5 text-violet" />
-          Sniper Terminal
+          Terminal
         </h3>
         <button 
           onClick={() => setShowSettings(!showSettings)}
@@ -70,6 +72,20 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
         >
           <Settings className="h-4 w-4" />
         </button>
+      </div>
+
+      <div className="mb-4 flex rounded-lg bg-surface p-1">
+        {(["snipe", "limit", "dca"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 rounded-md py-1.5 text-xs font-semibold capitalize transition-all ${
+              activeTab === tab ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
       <div className="space-y-3">
@@ -130,6 +146,32 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
           </div>
         </div>
       </div>
+
+      {activeTab === "limit" && (
+        <div className="mt-3 rounded-xl border border-border/50 bg-background/50 p-4 transition-colors focus-within:border-violet/50">
+          <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
+            <span>Trigger Price (USD)</span>
+            <span className="text-violet cursor-pointer hover:underline">Use Current</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              placeholder="0.00"
+              value={limitPrice}
+              onChange={(e) => setLimitPrice(e.target.value)}
+              className="w-full bg-transparent text-xl font-semibold outline-none placeholder:text-muted-foreground/30"
+            />
+          </div>
+        </div>
+      )}
+
+      {activeTab === "dca" && (
+        <div className="mt-3 rounded-xl border border-border/50 bg-background/50 p-4">
+          <div className="text-xs text-center text-muted-foreground">
+            DCA settings (Interval, Duration) would go here.
+          </div>
+        </div>
+      )}
 
       {/* Quote Details */}
       {quote && !isQuoting && (
@@ -215,14 +257,14 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
       >
         {swapMutation.isPending ? (
           <>
-            <Loader2 className="h-5 w-5 animate-spin" /> Executing Swap...
+            <Loader2 className="h-5 w-5 animate-spin" /> Processing...
           </>
         ) : swapMutation.isSuccess ? (
           <>
-            <CheckCircle2 className="h-5 w-5" /> Swap Confirmed
+            <CheckCircle2 className="h-5 w-5" /> Confirmed
           </>
         ) : (
-          "Execute Swap"
+          activeTab === "snipe" ? "Execute Swap" : `Place ${activeTab.toUpperCase()} Order`
         )}
       </button>
 
