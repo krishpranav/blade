@@ -77,8 +77,8 @@ export function TokenPage() {
 
         <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[260px_1fr_360px] items-start">
           {/* Left Sidebar: Trending */}
-          <div className="flex h-[800px] flex-col overflow-hidden rounded-xl border border-border bg-surface/20 shadow-card">
-            <div className="border-b border-border px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="flex h-[800px] flex-col overflow-hidden rounded-sm border border-neutral-800 bg-[#0d0d0d] shadow-none contain-strict">
+            <div className="border-b border-neutral-800 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               Hot Pairs
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
@@ -89,11 +89,11 @@ export function TokenPage() {
                     key={t.pairAddress}
                     to="/token/$mint"
                     params={{ mint: t.baseToken.address }}
-                    className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${isSelected ? "bg-surface-2 border border-border/50" : "hover:bg-surface"}`}
+                    className={`flex items-center justify-between rounded-sm px-3 py-2 text-sm transition-none ${isSelected ? "bg-[#1a1a1a] border border-neutral-700" : "hover:bg-[#111]"}`}
                   >
                     <div className="flex flex-col">
-                      <span className="font-semibold">{t.baseToken.symbol}</span>
-                      <span className="text-[10px] text-muted-foreground">${compact(t.liquidity?.usd || 0)} Liq</span>
+                      <span className="font-semibold text-white">{t.baseToken.symbol}</span>
+                      <span className="text-[10px] text-neutral-500">${compact(t.liquidity?.usd || 0)} Liq</span>
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="font-mono text-[12px]">{t.priceUsd ? fmtUsd(parseFloat(t.priceUsd)) : "—"}</span>
@@ -108,36 +108,36 @@ export function TokenPage() {
           </div>
 
           {/* Center Column: Header + Stats + Chart */}
-          <div className="flex flex-col gap-3 h-full">
-            <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-surface/40 p-4 shadow-card">
+          <div className="flex flex-col gap-3 h-full contain-layout">
+            <div className="flex flex-wrap items-center gap-4 rounded-sm border border-neutral-800 bg-black p-4 shadow-none">
               {top.info?.imageUrl ? (
-                <img src={top.info.imageUrl} alt="" className="h-12 w-12 rounded-full bg-surface-2 object-cover" />
+                <img src={top.info.imageUrl} alt="" className="h-12 w-12 rounded-sm bg-[#1a1a1a] object-cover" />
               ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet/20 text-sm font-semibold">
+                <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-violet/20 text-sm font-semibold text-violet">
                   {top.baseToken.symbol.slice(0, 3)}
                 </div>
               )}
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="font-display text-xl font-semibold tracking-tight">{top.baseToken.symbol}</h1>
-                  <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                  <h1 className="font-display text-xl font-semibold tracking-tight text-white">{top.baseToken.symbol}</h1>
+                  <span className="rounded-sm bg-[#1a1a1a] px-1.5 py-0.5 text-[10px] uppercase text-neutral-500 border border-neutral-800">
                     {top.dexId}
                   </span>
                 </div>
                 <button
                   onClick={() => navigator.clipboard.writeText(mint)}
-                  className="mt-1 inline-flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+                  className="mt-1 inline-flex items-center gap-1.5 font-mono text-[11px] text-neutral-500 hover:text-white"
                 >
                   {shortAddr(mint, 8)} <Copy className="h-3 w-3" />
                 </button>
               </div>
               <div className="ml-auto flex gap-3 text-right">
                 <div>
-                  <div className="text-[10px] uppercase text-muted-foreground">Price</div>
-                  <div className="font-mono text-lg font-semibold">{price ? fmtUsd(price) : "—"}</div>
+                  <div className="text-[10px] uppercase text-neutral-500">Price</div>
+                  <div className="font-mono text-lg font-semibold text-white">{price ? fmtUsd(price) : "—"}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase text-muted-foreground">24h</div>
+                  <div className="text-[10px] uppercase text-neutral-500">24h</div>
                   <div className={"font-mono text-lg " + pctClass(ch24)}>{fmtPct(ch24)}</div>
                 </div>
               </div>
@@ -151,26 +151,26 @@ export function TokenPage() {
               <Cell label="Trades" value={total ? total.toLocaleString() : "—"} />
             </div>
 
-            <div className="flex h-[400px] flex-col overflow-hidden rounded-xl border border-border bg-surface/40 shadow-card">
+            <div className="flex h-[400px] flex-col overflow-hidden rounded-sm border border-neutral-800 bg-black shadow-none contain-strict">
               <iframe
                 src={`https://dexscreener.com/solana/${top.pairAddress}?embed=1&theme=dark&trades=0&info=0`}
-                className="flex-1 w-full bg-background"
+                className="flex-1 w-full bg-black"
                 title="chart"
               />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex h-[380px] flex-col overflow-hidden rounded-xl shadow-card">
+              <div className="flex h-[380px] flex-col overflow-hidden rounded-sm shadow-none contain-strict">
                 <TradeHistory currentPriceUsd={price || 0.005} />
               </div>
-              <div className="flex h-[380px] flex-col overflow-hidden rounded-xl shadow-card">
+              <div className="flex h-[380px] flex-col overflow-hidden rounded-sm shadow-none contain-strict">
                 <SmartMoneyPanel />
               </div>
             </div>
           </div>
 
           {/* Right Column: SwapTerminal + Wallet + Security */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 contain-layout">
             <SwapTerminal defaultInput="SOL" defaultOutput={top.baseToken.symbol} />
             
             <WalletHoldings 
@@ -181,29 +181,27 @@ export function TokenPage() {
             <TokenSecurityPanel tokenSymbol={top.baseToken.symbol} />
             
             {/* Buy/sell pressure compact widget */}
-            <div className="rounded-xl border border-border bg-surface/40 p-4 shadow-card">
-              <div className="mb-2 flex justify-between text-[11px] text-muted-foreground">
+            <div className="rounded-sm border border-neutral-800 bg-black p-4 shadow-none">
+              <div className="mb-2 flex justify-between text-[11px] text-neutral-500 uppercase tracking-widest">
                 <span>Buy pressure (24h)</span>
                 <span>{buys24.toLocaleString()} / {sells24.toLocaleString()}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-bear/30">
-                <div className="h-full bg-bull transition-all" style={{ width: buyPct + "%" }} />
+              <div className="h-1.5 overflow-hidden rounded-sm bg-bear/30">
+                <div className="h-full bg-bull transition-none" style={{ width: buyPct + "%" }} />
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Removed old modals */}
     </AppLayout>
   );
 }
 
 function Cell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border bg-surface/40 px-3 py-2.5">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="font-mono text-sm font-semibold">{value}</div>
+    <div className="rounded-sm border border-neutral-800 bg-[#0a0a0a] px-3 py-2.5">
+      <div className="text-[9px] uppercase tracking-widest text-neutral-500">{label}</div>
+      <div className="font-mono text-[13px] font-semibold text-white">{value}</div>
     </div>
   );
 }

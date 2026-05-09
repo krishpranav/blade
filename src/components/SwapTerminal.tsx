@@ -60,7 +60,7 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
   };
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-border bg-surface/80 p-5 shadow-glow backdrop-blur-xl transition-all">
+    <div className="w-full max-w-md rounded-sm border border-neutral-800 bg-[#0d0d0d] p-5 shadow-none transition-none">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-display flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
           <Zap className="h-5 w-5 text-violet" />
@@ -74,13 +74,13 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
         </button>
       </div>
 
-      <div className="mb-4 flex rounded-lg bg-surface p-1">
+      <div className="mb-4 flex rounded-sm border border-neutral-800 bg-black p-0.5">
         {(["snipe", "limit", "dca"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 rounded-md py-1.5 text-xs font-semibold capitalize transition-all ${
-              activeTab === tab ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
+            className={`flex-1 rounded-sm py-1.5 text-xs font-semibold uppercase tracking-wider transition-none ${
+              activeTab === tab ? "bg-[#1a1a1a] text-white" : "text-neutral-500 hover:text-white"
             }`}
           >
             {tab}
@@ -90,8 +90,8 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
 
       <div className="space-y-3">
         {/* Input Box */}
-        <div className="rounded-xl border border-border/50 bg-background/50 p-4 transition-colors focus-within:border-violet/50">
-          <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
+        <div className="rounded-sm border border-neutral-800 bg-black p-4 transition-none focus-within:border-violet/50">
+          <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-neutral-500">
             <span>Pay</span>
             <span>Balance: 0.00 {inputMint}</span>
           </div>
@@ -122,16 +122,16 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
         </div>
 
         {/* Output Box */}
-        <div className="rounded-xl border border-border/50 bg-background/50 p-4">
-          <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
+        <div className="rounded-sm border border-neutral-800 bg-black p-4">
+          <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-neutral-500">
             <span>Receive (Estimated)</span>
             <span>Balance: 0.00 {outputMint}</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-full truncate text-3xl font-semibold text-foreground/80">
+            <div className="w-full truncate text-3xl font-semibold text-white">
               {isQuoting ? (
-                <span className="flex items-center gap-2 text-lg text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin" /> Fetching route...
+                <span className="flex items-center gap-2 text-lg text-neutral-500">
+                  <Loader2 className="h-5 w-5 animate-spin" /> Route...
                 </span>
               ) : quote?.expected_output ? (
                 quote.expected_output.toFixed(4)
@@ -139,8 +139,8 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
                 "0.00"
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-2 rounded-lg bg-surface px-3 py-1.5 font-semibold shadow-sm">
-              <div className="h-5 w-5 rounded-full bg-bull" />
+            <div className="flex shrink-0 items-center gap-2 rounded-sm bg-[#1a1a1a] px-3 py-1.5 font-semibold border border-neutral-800">
+              <div className="h-4 w-4 rounded-full bg-bull" />
               {outputMint}
             </div>
           </div>
@@ -148,10 +148,10 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
       </div>
 
       {activeTab === "limit" && (
-        <div className="mt-3 rounded-xl border border-border/50 bg-background/50 p-4 transition-colors focus-within:border-violet/50">
-          <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
+        <div className="mt-3 rounded-sm border border-neutral-800 bg-black p-4 transition-none focus-within:border-violet/50">
+          <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-neutral-500">
             <span>Trigger Price (USD)</span>
-            <span className="text-violet cursor-pointer hover:underline">Use Current</span>
+            <span className="text-violet cursor-pointer hover:underline">Current</span>
           </div>
           <div className="flex items-center gap-3">
             <input
@@ -166,19 +166,19 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
       )}
 
       {activeTab === "dca" && (
-        <div className="mt-3 rounded-xl border border-border/50 bg-background/50 p-4">
-          <div className="text-xs text-center text-muted-foreground">
-            DCA settings (Interval, Duration) would go here.
+        <div className="mt-3 rounded-sm border border-neutral-800 bg-black p-4">
+          <div className="text-[10px] uppercase text-center text-neutral-500">
+            DCA settings (Interval, Duration)
           </div>
         </div>
       )}
 
       {/* Quote Details */}
       {quote && !isQuoting && (
-        <div className="mt-4 rounded-xl border border-border/40 bg-surface/30 p-3 text-xs text-muted-foreground">
+        <div className="mt-4 rounded-sm border border-neutral-800 bg-black p-3 text-[10px] uppercase tracking-wider text-neutral-500">
           <div className="flex justify-between py-1">
             <span>Minimum Received</span>
-            <span className="font-mono text-foreground">{quote.minimum_received.toFixed(4)} {outputMint}</span>
+            <span className="font-mono text-white">{quote.minimum_received.toFixed(4)} {outputMint}</span>
           </div>
           <div className="flex justify-between py-1">
             <span>Price Impact</span>
@@ -186,7 +186,7 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
           </div>
           <div className="flex justify-between py-1">
             <span>Network Fee</span>
-            <span className="font-mono text-foreground">{quote.fee.toFixed(6)} SOL</span>
+            <span className="font-mono text-white">{quote.fee.toFixed(6)} SOL</span>
           </div>
           <div className="flex justify-between py-1">
             <span>Route</span>
@@ -197,7 +197,7 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
 
       {/* Advanced Settings Panel */}
       {showSettings && (
-        <div className="mt-3 space-y-3 rounded-xl border border-border/40 bg-surface/30 p-4">
+        <div className="mt-3 space-y-3 rounded-sm border border-neutral-800 bg-black p-4">
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Max Slippage</span>
@@ -253,7 +253,7 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
       <button
         onClick={() => swapMutation.mutate()}
         disabled={!amount || Number(amount) <= 0 || swapMutation.isPending}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-gradient py-4 font-semibold text-primary-foreground shadow-glow transition-all hover:scale-[1.01] hover:shadow-violet/30 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-sm bg-violet/90 py-3 text-[13px] uppercase tracking-wider font-bold text-white transition-none hover:bg-violet disabled:cursor-not-allowed disabled:opacity-50"
       >
         {swapMutation.isPending ? (
           <>
