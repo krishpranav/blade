@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, memo } from "react";
 import { Eye, TrendingUp, TrendingDown, Star } from "lucide-react";
 import { compact, fmtUsd, shortAddr } from "@/lib/format";
 
@@ -12,7 +12,7 @@ type IntelEvent = {
   timestamp: number;
 };
 
-export function SmartMoneyPanel() {
+export const SmartMoneyPanel = memo(function SmartMoneyPanel() {
   const [events, setEvents] = useState<IntelEvent[]>([]);
 
   useEffect(() => {
@@ -31,13 +31,13 @@ export function SmartMoneyPanel() {
   }, []);
 
   return (
-    <div className="rounded-xl border border-border bg-surface/40 p-4 shadow-card">
-      <div className="mb-3 flex items-center justify-between border-b border-border/40 pb-2">
-        <h3 className="font-display flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          <Eye className="h-4 w-4 text-violet" />
-          Smart Money Intel
+    <div className="flex flex-col overflow-hidden rounded-sm border border-neutral-800 bg-black shadow-none">
+      <div className="border-b border-neutral-800 bg-[#0a0a0a] px-3 py-2 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+          <Eye className="h-3 w-3 text-violet" />
+          Intel Feed
         </h3>
-        <span className="flex items-center gap-1.5 text-[10px] text-bull">
+        <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-bull">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-bull opacity-75"></span>
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-bull"></span>
@@ -46,44 +46,48 @@ export function SmartMoneyPanel() {
         </span>
       </div>
 
-      <div className="space-y-2">
+      <div className="flex-1 overflow-y-auto contain-strict">
         {events.map((ev) => (
-          <div key={ev.id} className="flex items-center justify-between rounded-lg border border-border/30 bg-surface/30 p-2.5 transition-colors hover:bg-surface/60">
-            <div className="flex items-center gap-3">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full ${ev.type === "buy" ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"}`}>
-                {ev.type === "buy" ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-xs font-semibold text-foreground hover:text-violet hover:underline cursor-pointer">
-                    {shortAddr(ev.wallet, 4)}
-                  </span>
-                  {ev.isSmartMoney && (
-                    <span className="flex items-center rounded-sm bg-amber-500/10 px-1 py-0.5 text-[9px] font-bold uppercase text-amber-500">
-                      <Star className="mr-0.5 h-2.5 w-2.5" /> Smart
-                    </span>
-                  )}
-                  {ev.isFreshWallet && !ev.isSmartMoney && (
-                    <span className="rounded-sm bg-blue-500/10 px-1 py-0.5 text-[9px] font-bold uppercase text-blue-400">
-                      Fresh
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] text-muted-foreground">
-                  {new Date(ev.timestamp).toLocaleTimeString([], { hour12: false, second: '2-digit' })}
-                </span>
-              </div>
-            </div>
-            
-            <div className={`font-mono text-sm font-bold ${ev.type === "buy" ? "text-bull" : "text-bear"}`}>
-              {ev.type === "buy" ? "+" : "-"}{fmtUsd(ev.amountUsd)}
-            </div>
-          </div>
+          <IntelRow key={ev.id} ev={ev} />
         ))}
       </div>
     </div>
   );
-}
+});
+
+const IntelRow = memo(({ ev }: { ev: IntelEvent }) => (
+  <div className="flex items-center justify-between border-b border-neutral-900/50 bg-transparent px-3 py-2 transition-none hover:bg-[#111]">
+    <div className="flex items-center gap-3">
+      <div className={`flex h-6 w-6 items-center justify-center rounded-sm ${ev.type === "buy" ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"}`}>
+        {ev.type === "buy" ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      </div>
+      <div className="flex flex-col">
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-[11px] font-bold text-white hover:text-violet hover:underline cursor-pointer">
+            {shortAddr(ev.wallet, 4)}
+          </span>
+          {ev.isSmartMoney && (
+            <span className="flex items-center rounded-sm bg-amber-500/10 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-500 border border-amber-500/20">
+              <Star className="mr-0.5 h-2 w-2" /> Smart
+            </span>
+          )}
+          {ev.isFreshWallet && !ev.isSmartMoney && (
+            <span className="rounded-sm bg-blue-500/10 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-blue-400 border border-blue-500/20">
+              Fresh
+            </span>
+          )}
+        </div>
+        <span className="text-[9px] text-neutral-500 font-mono">
+          {new Date(ev.timestamp).toLocaleTimeString([], { hour12: false, second: '2-digit' })}
+        </span>
+      </div>
+    </div>
+    
+    <div className={`font-mono text-[12px] font-bold ${ev.type === "buy" ? "text-bull" : "text-bear"}`}>
+      {ev.type === "buy" ? "+" : "-"}{fmtUsd(ev.amountUsd)}
+    </div>
+  </div>
+));
 
 function createIntelEvent(ageSeconds: number): IntelEvent {
   const isBuy = Math.random() > 0.3; // Whales are accumulating?

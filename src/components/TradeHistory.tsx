@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, memo } from "react";
 import { compact, shortAddr } from "@/lib/format";
 
 type Trade = {
@@ -11,7 +11,7 @@ type Trade = {
   timestamp: number;
 };
 
-export function TradeHistory({ currentPriceUsd = 0.005 }: { currentPriceUsd?: number }) {
+export const TradeHistory = memo(function TradeHistory({ currentPriceUsd = 0.005 }: { currentPriceUsd?: number }) {
   const [trades, setTrades] = useState<Trade[]>([]);
 
   useEffect(() => {
@@ -31,61 +31,65 @@ export function TradeHistory({ currentPriceUsd = 0.005 }: { currentPriceUsd?: nu
   }, [currentPriceUsd]);
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface/40 shadow-card">
-      <div className="border-b border-border px-4 py-2.5 flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Recent Trades
+    <div className="flex flex-col overflow-hidden rounded-sm border border-neutral-800 bg-black shadow-none">
+      <div className="border-b border-neutral-800 bg-[#0a0a0a] px-3 py-2 flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+          Order Feed
         </span>
-        <span className="flex items-center gap-1.5 text-[10px] text-bull">
+        <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-bull">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-bull opacity-75"></span>
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-bull"></span>
           </span>
-          Live Feed
+          Live
         </span>
       </div>
       
-      <div className="flex-1 overflow-x-auto">
-        <table className="w-full text-left text-[11px]">
-          <thead className="bg-surface/60 uppercase text-muted-foreground">
+      <div className="flex-1 overflow-x-auto contain-strict">
+        <table className="w-full text-left text-[11px] border-collapse">
+          <thead className="bg-[#050505] uppercase tracking-wider text-neutral-600 border-b border-neutral-800">
             <tr>
-              <th className="px-3 py-2 font-medium">Time</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium text-right">Price</th>
-              <th className="px-3 py-2 font-medium text-right">USD</th>
-              <th className="px-3 py-2 font-medium text-right">Size</th>
-              <th className="px-3 py-2 font-medium text-right">Maker</th>
+              <th className="px-3 py-1.5 font-medium whitespace-nowrap">Time</th>
+              <th className="px-3 py-1.5 font-medium whitespace-nowrap">Type</th>
+              <th className="px-3 py-1.5 font-medium whitespace-nowrap text-right">Price</th>
+              <th className="px-3 py-1.5 font-medium whitespace-nowrap text-right">USD</th>
+              <th className="px-3 py-1.5 font-medium whitespace-nowrap text-right">Size</th>
+              <th className="px-3 py-1.5 font-medium whitespace-nowrap text-right">Maker</th>
             </tr>
           </thead>
           <tbody className="font-mono">
             {trades.map((t) => (
-              <tr key={t.id} className="border-t border-border/20 hover:bg-surface-2/50 transition-colors">
-                <td className="px-3 py-1.5 text-muted-foreground">
-                  {new Date(t.timestamp).toLocaleTimeString([], { hour12: false, second: '2-digit' })}
-                </td>
-                <td className={`px-3 py-1.5 font-semibold ${t.type === "buy" ? "text-bull" : "text-bear"}`}>
-                  {t.type.toUpperCase()}
-                </td>
-                <td className={`px-3 py-1.5 text-right ${t.type === "buy" ? "text-bull" : "text-bear"}`}>
-                  ${t.priceUsd.toFixed(6)}
-                </td>
-                <td className="px-3 py-1.5 text-right text-foreground">
-                  ${compact(t.amountUsd)}
-                </td>
-                <td className="px-3 py-1.5 text-right text-muted-foreground">
-                  {compact(t.amountToken)}
-                </td>
-                <td className="px-3 py-1.5 text-right text-violet hover:underline cursor-pointer">
-                  {shortAddr(t.wallet, 4)}
-                </td>
-              </tr>
+              <TradeRow key={t.id} t={t} />
             ))}
           </tbody>
         </table>
       </div>
     </div>
   );
-}
+});
+
+const TradeRow = memo(({ t }: { t: Trade }) => (
+  <tr className="border-b border-neutral-900/50 hover:bg-[#111] transition-none">
+    <td className="px-3 py-1 text-neutral-500">
+      {new Date(t.timestamp).toLocaleTimeString([], { hour12: false, second: '2-digit' })}
+    </td>
+    <td className={`px-3 py-1 font-bold uppercase ${t.type === "buy" ? "text-bull" : "text-bear"}`}>
+      {t.type}
+    </td>
+    <td className={`px-3 py-1 text-right ${t.type === "buy" ? "text-bull" : "text-bear"}`}>
+      ${t.priceUsd.toFixed(6)}
+    </td>
+    <td className="px-3 py-1 text-right text-white">
+      ${compact(t.amountUsd)}
+    </td>
+    <td className="px-3 py-1 text-right text-neutral-500">
+      {compact(t.amountToken)}
+    </td>
+    <td className="px-3 py-1 text-right text-neutral-400 hover:text-white cursor-pointer">
+      {shortAddr(t.wallet, 4)}
+    </td>
+  </tr>
+));
 
 function createMockTrade(basePrice: number, ageSeconds: number): Trade {
   const isBuy = Math.random() > 0.4; // Slightly more buys
