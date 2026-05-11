@@ -1,9 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useMemo, memo } from "react";
 import { useWallet } from "@/lib/wallet";
 import { Wallet, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { compact, fmtUsd } from "@/lib/format";
 
-export function WalletHoldings({ tokenSymbol = "TOKEN", currentPriceUsd = 0 }) {
+export const WalletHoldings = memo(function WalletHoldings({ tokenSymbol = "TOKEN", currentPriceUsd = 0 }: { tokenSymbol?: string, currentPriceUsd?: number }) {
   const { publicKey, solBalance, connect } = useWallet();
 
   // Mock holdings data for demonstration
@@ -28,15 +28,15 @@ export function WalletHoldings({ tokenSymbol = "TOKEN", currentPriceUsd = 0 }) {
 
   if (!publicKey) {
     return (
-      <div className="rounded-xl border border-border bg-surface/40 p-5 shadow-card text-center">
-        <Wallet className="mx-auto h-8 w-8 text-muted-foreground opacity-50" />
-        <h3 className="mt-3 font-display text-sm font-semibold">Connect Wallet</h3>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Connect your wallet to track your holdings and PnL.
+      <div className="rounded-sm border border-neutral-800 bg-black p-4 shadow-none text-center">
+        <Wallet className="mx-auto h-6 w-6 text-neutral-600" />
+        <h3 className="mt-3 font-display text-[11px] font-semibold uppercase tracking-widest text-neutral-500">Connect Wallet</h3>
+        <p className="mt-1 text-[9px] text-neutral-600 uppercase tracking-widest">
+          Connect to track PnL
         </p>
         <button
           onClick={connect}
-          className="mt-4 w-full rounded-lg bg-surface-2 py-2 text-xs font-semibold hover:bg-surface transition-colors"
+          className="mt-4 w-full rounded-sm bg-violet/20 text-violet py-2 text-xs font-bold uppercase tracking-wider hover:bg-violet hover:text-white transition-none border border-violet/30"
         >
           Connect Phantom
         </button>
@@ -45,49 +45,49 @@ export function WalletHoldings({ tokenSymbol = "TOKEN", currentPriceUsd = 0 }) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface/40 p-5 shadow-card">
-      <div className="mb-4 flex items-center justify-between border-b border-border/40 pb-3">
-        <h3 className="font-display flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          <Wallet className="h-4 w-4 text-violet" />
-          My Portfolio
+    <div className="rounded-sm border border-neutral-800 bg-black p-4 shadow-none">
+      <div className="mb-4 flex items-center justify-between border-b border-neutral-800 pb-3">
+        <h3 className="font-display flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+          <Wallet className="h-3 w-3 text-violet" />
+          Portfolio
         </h3>
-        <div className="text-[11px] font-mono font-semibold text-foreground">
+        <div className="text-[11px] font-mono font-semibold text-white">
           {solBalance?.toFixed(3)} SOL
         </div>
       </div>
 
       <div className="space-y-4">
         <div>
-          <div className="flex justify-between text-[11px] text-muted-foreground uppercase tracking-tight">
+          <div className="flex justify-between text-[9px] text-neutral-500 uppercase tracking-widest">
             <span>Holdings</span>
             <span>Value (USD)</span>
           </div>
           <div className="mt-1 flex justify-between items-baseline">
-            <span className="font-mono text-lg font-bold">{compact(holdings?.amount || 0)} {tokenSymbol}</span>
-            <span className="font-mono text-sm font-semibold text-foreground">
+            <span className="font-mono text-sm font-bold text-white">{compact(holdings?.amount || 0)} {tokenSymbol}</span>
+            <span className="font-mono text-sm font-semibold text-white">
               {fmtUsd(holdings?.valueUsd || 0)}
             </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/20">
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-800">
           <div>
-            <div className="text-[10px] text-muted-foreground uppercase">Avg Entry</div>
-            <div className="font-mono text-xs font-semibold">{fmtUsd(holdings?.avgEntry || 0)}</div>
+            <div className="text-[9px] text-neutral-500 uppercase tracking-widest">Avg Entry</div>
+            <div className="font-mono text-[11px] font-semibold text-white">{fmtUsd(holdings?.avgEntry || 0)}</div>
           </div>
           <div className="text-right">
-            <div className="text-[10px] text-muted-foreground uppercase">Unrealized PnL</div>
-            <div className={`flex items-center justify-end gap-1 font-mono text-xs font-bold ${holdings && holdings.pnlUsd >= 0 ? "text-bull" : "text-bear"}`}>
-              {holdings && holdings.pnlUsd >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            <div className="text-[9px] text-neutral-500 uppercase tracking-widest">Unrealized PnL</div>
+            <div className={`flex items-center justify-end gap-1 font-mono text-[11px] font-bold ${holdings && holdings.pnlUsd >= 0 ? "text-bull" : "text-bear"}`}>
+              {holdings && holdings.pnlUsd >= 0 ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
               {holdings && holdings.pnlUsd >= 0 ? "+" : ""}{fmtUsd(holdings?.pnlUsd || 0)}
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg bg-surface-2/60 p-3">
+        <div className="rounded-sm bg-[#0a0a0a] p-3 border border-neutral-900">
           <div className="flex justify-between items-center">
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Total Return</span>
-            <span className={`rounded px-1.5 py-0.5 font-mono text-[11px] font-bold ${holdings && holdings.pnlPct >= 0 ? "bg-bull/15 text-bull" : "bg-bear/15 text-bear"}`}>
+            <span className="text-[9px] font-semibold text-neutral-500 uppercase tracking-widest">Total Return</span>
+            <span className={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-bold border ${holdings && holdings.pnlPct >= 0 ? "bg-bull/10 text-bull border-bull/20" : "bg-bear/10 text-bear border-bear/20"}`}>
               {holdings && holdings.pnlPct >= 0 ? "+" : ""}{holdings?.pnlPct.toFixed(2)}%
             </span>
           </div>
@@ -95,4 +95,4 @@ export function WalletHoldings({ tokenSymbol = "TOKEN", currentPriceUsd = 0 }) {
       </div>
     </div>
   );
-}
+});
