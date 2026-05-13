@@ -7,9 +7,11 @@ import { ageFromMs, compact, fmtPct, fmtUsd, pctClass, shortAddr } from "@/lib/f
 import { ExternalLink, Copy, ArrowLeft } from "lucide-react";
 import { SwapTerminal } from "@/components/SwapTerminal";
 import { TradeHistory } from "@/components/TradeHistory";
+import { NativeChart } from "@/components/NativeChart";
 import { SmartMoneyPanel } from "@/components/SmartMoneyPanel";
 import { WalletHoldings } from "@/components/WalletHoldings";
 import { TokenSecurityPanel } from "@/components/TokenSecurityPanel";
+import { PositionManager } from "@/components/PositionManager";
 
 export function TokenPage() {
   const { mint } = useParams({ from: "/token/$mint" });
@@ -151,12 +153,8 @@ export function TokenPage() {
               <Cell label="Trades" value={total ? total.toLocaleString() : "—"} />
             </div>
 
-            <div className="flex h-[400px] flex-col overflow-hidden rounded-sm border border-neutral-800 bg-black shadow-none contain-strict">
-              <iframe
-                src={`https://dexscreener.com/solana/${top.pairAddress}?embed=1&theme=dark&trades=0&info=0`}
-                className="flex-1 w-full bg-black"
-                title="chart"
-              />
+            <div className="flex h-[400px] flex-col overflow-hidden rounded-sm border border-neutral-800 bg-black shadow-none contain-strict relative">
+              <NativeChart width={800} height={400} />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -192,6 +190,9 @@ export function TokenPage() {
             </div>
           </div>
         </div>
+
+        {/* Bottom Full-Width Panel: Position Management */}
+        <PositionManager />
       </div>
     </AppLayout>
   );
