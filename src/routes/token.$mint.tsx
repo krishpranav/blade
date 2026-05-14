@@ -12,6 +12,11 @@ import { SmartMoneyPanel } from "@/components/SmartMoneyPanel";
 import { WalletHoldings } from "@/components/WalletHoldings";
 import { TokenSecurityPanel } from "@/components/TokenSecurityPanel";
 import { PositionManager } from "@/components/PositionManager";
+import { AlertsEngine } from "@/components/AlertsEngine";
+import { OrderFlowHeatmap } from "@/components/OrderFlowHeatmap";
+import { CopyTradingLeaderboard } from "@/components/CopyTradingLeaderboard";
+import { DeepRiskAnalyzer } from "@/components/DeepRiskAnalyzer";
+import { SniperBot } from "@/components/SniperBot";
 
 export function TokenPage() {
   const { mint } = useParams({ from: "/token/$mint" });
@@ -165,19 +170,24 @@ export function TokenPage() {
                 <SmartMoneyPanel />
               </div>
             </div>
+
+            {/* Order Flow Heatmap */}
+            <OrderFlowHeatmap currentPriceUsd={price || 0.005} />
           </div>
 
           {/* Right Column: SwapTerminal + Wallet + Security */}
           <div className="flex flex-col gap-3 contain-layout">
             <SwapTerminal defaultInput="SOL" defaultOutput={top.baseToken.symbol} />
-            
+
+            <AlertsEngine tokenSymbol={top.baseToken.symbol} currentPriceUsd={price || 0} />
+
             <WalletHoldings 
               tokenSymbol={top.baseToken.symbol} 
               currentPriceUsd={price || 0} 
             />
 
-            <TokenSecurityPanel tokenSymbol={top.baseToken.symbol} />
-            
+            <DeepRiskAnalyzer tokenSymbol={top.baseToken.symbol} />
+
             {/* Buy/sell pressure compact widget */}
             <div className="rounded-sm border border-neutral-800 bg-black p-4 shadow-none">
               <div className="mb-2 flex justify-between text-[11px] text-neutral-500 uppercase tracking-widest">
@@ -193,6 +203,16 @@ export function TokenPage() {
 
         {/* Bottom Full-Width Panel: Position Management */}
         <PositionManager />
+
+        {/* Copy Trading Leaderboard */}
+        <div className="mt-4">
+          <CopyTradingLeaderboard />
+        </div>
+
+        {/* Sniper Bot */}
+        <div className="mt-4">
+          <SniperBot tokenSymbol={top.baseToken.symbol} currentPriceUsd={price || 0} />
+        </div>
       </div>
     </AppLayout>
   );
