@@ -1,10 +1,10 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { getTokenPairs, getTrendingSolana } from "@/server/solana";
 import { ageFromMs, compact, fmtPct, fmtUsd, pctClass, shortAddr } from "@/lib/format";
-import { ExternalLink, Copy, ArrowLeft } from "lucide-react";
+import { ExternalLink, Copy, ArrowLeft, Command } from "lucide-react";
 import { SwapTerminal } from "@/components/SwapTerminal";
 import { TradeHistory } from "@/components/TradeHistory";
 import { NativeChart } from "@/components/NativeChart";
@@ -17,9 +17,25 @@ import { OrderFlowHeatmap } from "@/components/OrderFlowHeatmap";
 import { CopyTradingLeaderboard } from "@/components/CopyTradingLeaderboard";
 import { DeepRiskAnalyzer } from "@/components/DeepRiskAnalyzer";
 import { SniperBot } from "@/components/SniperBot";
+import { WalletInspector } from "@/components/WalletInspector";
+import { BundleDetector } from "@/components/BundleDetector";
+import { GlobalSearchOverlay } from "@/components/GlobalSearch";
 
 export function TokenPage() {
   const { mint } = useParams({ from: "/token/$mint" });
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Global Cmd+K shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
   const { data, isLoading } = useQuery({
     queryKey: ["token-pairs", mint],
     queryFn: () => getTokenPairs({ data: { mint } }),
@@ -74,13 +90,26 @@ export function TokenPage() {
 
   return (
     <AppLayout>
+      {/* Global Search */}
+      <GlobalSearchOverlay isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+
       <div className="mx-auto max-w-[1600px] px-4 py-6">
-        <button
-          onClick={() => window.history.back()}
-          className="mb-4 inline-flex items-center gap-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back
-        </button>
+        <div className="mb-4 flex items-center justify-between">
+          <button
+            onClick={() => window.history.back()}
+            className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back
+          </button>
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex items-center gap-2 rounded-sm border border-neutral-800 bg-[#0a0a0a] px-3 py-1.5 text-[10px] text-neutral-500 hover:border-neutral-600 hover:text-white transition-none"
+          >
+            <Command className="h-3 w-3" />
+            <span>Search tokens</span>
+            <kbd className="rounded border border-neutral-800 bg-neutral-900 px-1 font-mono text-[9px]">⌘K</kbd>
+          </button>
+        </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[260px_1fr_360px] items-start">
           {/* Left Sidebar: Trending */}
@@ -207,6 +236,16 @@ export function TokenPage() {
         {/* Copy Trading Leaderboard */}
         <div className="mt-4">
           <CopyTradingLeaderboard />
+        </div>
+
+        {/* Bundle Detector */}
+        <div className="mt-4">
+          <BundleDetector tokenSymbol={top.baseToken.symbol} />
+        </div>
+
+        {/* Wallet Inspector */}
+        <div className="mt-4">
+          <WalletInspector />
         </div>
 
         {/* Sniper Bot */}
