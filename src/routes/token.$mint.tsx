@@ -20,6 +20,10 @@ import { SniperBot } from "@/components/SniperBot";
 import { WalletInspector } from "@/components/WalletInspector";
 import { BundleDetector } from "@/components/BundleDetector";
 import { GlobalSearchOverlay } from "@/components/GlobalSearch";
+import { SocialSentimentFeed } from "@/components/SocialSentimentFeed";
+import { RiskCalculator } from "@/components/RiskCalculator";
+import { TradingJournal } from "@/components/TradingJournal";
+import { MarketOverviewBar } from "@/components/MarketOverviewBar";
 
 export function TokenPage() {
   const { mint } = useParams({ from: "/token/$mint" });
@@ -94,6 +98,10 @@ export function TokenPage() {
       <GlobalSearchOverlay isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <div className="mx-auto max-w-[1600px] px-4 py-6">
+        {/* Live market bar */}
+        <div className="mb-4">
+          <MarketOverviewBar />
+        </div>
         <div className="mb-4 flex items-center justify-between">
           <button
             onClick={() => window.history.back()}
@@ -210,6 +218,8 @@ export function TokenPage() {
 
             <AlertsEngine tokenSymbol={top.baseToken.symbol} currentPriceUsd={price || 0} />
 
+            <RiskCalculator currentPriceUsd={price || 0} />
+
             <WalletHoldings 
               tokenSymbol={top.baseToken.symbol} 
               currentPriceUsd={price || 0} 
@@ -246,6 +256,16 @@ export function TokenPage() {
         {/* Wallet Inspector */}
         <div className="mt-4">
           <WalletInspector />
+        </div>
+
+        {/* Social Sentiment */}
+        <div className="mt-4">
+          <SocialSentimentFeed tokenSymbol={top.baseToken.symbol} />
+        </div>
+
+        {/* Trading Journal */}
+        <div className="mt-4">
+          <TradingJournal currentSymbol={top.baseToken.symbol} />
         </div>
 
         {/* Sniper Bot */}
