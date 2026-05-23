@@ -1,6 +1,6 @@
-import React, { useState, useCallback, memo } from "react";
+import React, { useState, useCallback, memo, useEffect } from "react";
 import { Search, X, TrendingUp, ExternalLink, Loader2 } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getTrendingSolana } from "@/server/solana";
 import { compact, fmtPct, fmtUsd, pctClass } from "@/lib/format";
@@ -23,6 +23,12 @@ export const GlobalSearchOverlay = memo(function GlobalSearchOverlay({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query, isOpen]);
 
   const { data: trending, isLoading } = useQuery({
     queryKey: ["trending-solana"],
@@ -65,7 +71,26 @@ export const GlobalSearchOverlay = memo(function GlobalSearchOverlay({
             placeholder="Search tokens by name, symbol, or address..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && onClose()}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                onClose();
+              } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setSelectedIndex((prev) => (results.length > 0 ? (prev + 1) % results.length : 0));
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setSelectedIndex((prev) => (results.length > 0 ? (prev - 1 + results.length) % results.length : 0));
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                if (results[selectedIndex]) {
+                  navigate({
+                    to: "/token/$mint",
+                    params: { mint: results[selectedIndex].baseToken.address },
+                  });
+                  onClose();
+                }
+              }
+            }}
             className="flex-1 bg-transparent font-mono text-sm text-white outline-none placeholder:text-neutral-600"
           />
           {query && (
@@ -101,16 +126,19 @@ export const GlobalSearchOverlay = memo(function GlobalSearchOverlay({
             </div>
           )}
 
-          {results.map((token) => {
+          {results.map((token, index) => {
             const ch24 = token.priceChange?.h24 ?? null;
             const price = token.priceUsd ? parseFloat(token.priceUsd) : null;
+            const isSelected = index === selectedIndex;
             return (
               <Link
                 key={token.pairAddress}
                 to="/token/$mint"
                 params={{ mint: token.baseToken.address }}
                 onClick={onClose}
-                className="flex items-center justify-between px-4 py-3 hover:bg-[#161616] transition-none border-b border-neutral-900/50 last:border-0"
+                className={`flex items-center justify-between px-4 py-3 transition-none border-b border-neutral-900/50 last:border-0 hover:bg-[#161616] ${
+                  isSelected ? "bg-[#1a1a1a] border-l-2 border-violet" : ""
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-violet/10 text-xs font-bold text-violet border border-violet/20">

@@ -1,5 +1,6 @@
 export function fmtUsd(n: number | null | undefined, opts: { compact?: boolean } = {}): string {
   if (n === null || n === undefined || !isFinite(n)) return "—";
+  if (n === 0) return "$0.00";
   if (opts.compact && Math.abs(n) >= 1000) {
     return "$" + compact(n);
   }

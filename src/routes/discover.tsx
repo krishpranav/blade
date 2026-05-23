@@ -100,7 +100,9 @@ export function DiscoverPage() {
     let list: DSPair[] = baseData ?? [];
 
     if (tab === "watchlist") {
-      list = (trendingQ.data ?? []).filter((p) => watchlist.has(p.baseToken.address));
+      const allPairs = [...(trendingQ.data ?? []), ...(memesQ.data ?? [])];
+      const unique = Array.from(new Map(allPairs.map((p) => [p.baseToken.address, p])).values());
+      list = unique.filter((p) => watchlist.has(p.baseToken.address));
     }
 
     if (q.trim()) {

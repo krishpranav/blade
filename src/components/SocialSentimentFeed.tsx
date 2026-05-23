@@ -121,11 +121,20 @@ export const SocialSentimentFeed = memo(function SocialSentimentFeed({
   // Simulate periodic metric updates
   useEffect(() => {
     const interval = setInterval(() => {
-      setMetrics((prev) => ({
-        ...prev,
-        mentionsLast1h: prev.mentionsLast1h + Math.floor(Math.random() * 10),
-        bullishPct: Math.min(90, Math.max(10, prev.bullishPct + (Math.random() - 0.5) * 3)),
-      }));
+      setMetrics((prev) => {
+        const nextBullish = Math.min(90, Math.max(10, prev.bullishPct + (Math.random() - 0.5) * 3));
+        const remaining = 100 - nextBullish;
+        const neutralRatio = prev.neutralPct / (prev.neutralPct + prev.bearishPct || 1);
+        const nextNeutral = remaining * neutralRatio;
+        const nextBearish = remaining - nextNeutral;
+        return {
+          ...prev,
+          mentionsLast1h: prev.mentionsLast1h + Math.floor(Math.random() * 10),
+          bullishPct: nextBullish,
+          neutralPct: nextNeutral,
+          bearishPct: nextBearish,
+        };
+      });
     }, 5000);
     return () => clearInterval(interval);
   }, []);

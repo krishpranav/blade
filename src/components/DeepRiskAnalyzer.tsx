@@ -163,7 +163,7 @@ export const DeepRiskAnalyzer = memo(function DeepRiskAnalyzer({
                   <div
                     className="absolute left-0 top-0 h-full rounded-sm"
                     style={{
-                      width: `${(h.pct / 6) * 100}%`,
+                      width: `${(h.pct / (Math.max(...holders.map((x) => x.pct)) || 1)) * 100}%`,
                       background: h.isKnown ? "rgba(139, 92, 246, 0.5)" : "rgba(16, 185, 129, 0.4)",
                     }}
                   />

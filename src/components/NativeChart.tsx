@@ -49,6 +49,7 @@ export const NativeChart = memo(function NativeChart({ width = 800, height = 400
     // Live tick simulation
     const interval = setInterval(() => {
       setCandles(prev => {
+        if (prev.length === 0) return prev;
         const last = prev[prev.length - 1];
         const newClose = last.close + (Math.random() - 0.5) * last.close * 0.01;
         const newHigh = Math.max(last.high, newClose);

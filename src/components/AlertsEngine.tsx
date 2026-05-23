@@ -9,6 +9,7 @@ type PriceAlert = {
   tokenSymbol: string;
   condition: AlertCondition;
   targetValue: number;
+  baselinePrice: number;
   triggered: boolean;
   createdAt: number;
   note?: string;
@@ -56,11 +57,10 @@ export const AlertsEngine = memo(function AlertsEngine({
           shouldTrigger = currentPriceUsd <= alert.targetValue;
           break;
         case "pct_gain":
-          // Compare against a baseline (use first alert price as baseline concept)
-          shouldTrigger = false;
+          shouldTrigger = currentPriceUsd >= alert.baselinePrice * (1 + alert.targetValue / 100);
           break;
         case "pct_loss":
-          shouldTrigger = false;
+          shouldTrigger = currentPriceUsd <= alert.baselinePrice * (1 - alert.targetValue / 100);
           break;
       }
 
@@ -71,7 +71,11 @@ export const AlertsEngine = memo(function AlertsEngine({
         // Browser notification
         if ("Notification" in window && Notification.permission === "granted") {
           new Notification(`🔔 Blade Alert: ${alert.tokenSymbol}`, {
-            body: `${CONDITION_LABELS[alert.condition]} ${fmtUsd(alert.targetValue)}. Current: ${fmtUsd(currentPriceUsd)}. ${alert.note ?? ""}`,
+            body: `${CONDITION_LABELS[alert.condition]} ${
+              alert.condition.startsWith("pct")
+                ? alert.targetValue + "%"
+                : fmtUsd(alert.targetValue)
+            }. Current: ${fmtUsd(currentPriceUsd)}. ${alert.note ?? ""}`,
             icon: "/favicon.ico",
           });
         }
@@ -104,6 +108,7 @@ export const AlertsEngine = memo(function AlertsEngine({
       tokenSymbol,
       condition,
       targetValue: value,
+      baselinePrice: currentPriceUsd || value,
       triggered: false,
       createdAt: Date.now(),
       note: note.trim() || undefined,
@@ -111,7 +116,7 @@ export const AlertsEngine = memo(function AlertsEngine({
     setAlerts((prev) => [newAlert, ...prev]);
     setTargetValue("");
     setNote("");
-  }, [condition, targetValue, note, tokenSymbol]);
+  }, [condition, targetValue, note, tokenSymbol, currentPriceUsd]);
 
   const removeAlert = useCallback((id: string) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));

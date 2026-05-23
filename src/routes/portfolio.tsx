@@ -17,7 +17,14 @@ export function PortfolioPage() {
     staleTime: 30_000,
   });
 
-  const mints = (holdings?.tokens ?? []).slice(0, 30).map((t) => t.mint);
+  const mints = (() => {
+    const list = (holdings?.tokens ?? []).slice(0, 30).map((t) => t.mint);
+    if (holdings && !list.includes("So11111111111111111111111111111111111111112")) {
+      list.push("So11111111111111111111111111111111111111112");
+    }
+    return list;
+  })();
+
   const { data: pairs } = useQuery({
     queryKey: ["tokens-info", mints.join(",")],
     queryFn: () => getTokensInfo({ data: { mints } }),
@@ -37,7 +44,9 @@ export function PortfolioPage() {
     }
   }
 
-  const SOL_PRICE = (pairs ?? []).find((p) => p.baseToken.symbol === "SOL")?.priceUsd ?? null;
+  const SOL_PRICE = (pairs ?? []).find(
+    (p) => p.baseToken.symbol === "SOL" || p.baseToken.address === "So11111111111111111111111111111111111111112"
+  )?.priceUsd ?? null;
 
   const enriched = (holdings?.tokens ?? [])
     .map((t) => {

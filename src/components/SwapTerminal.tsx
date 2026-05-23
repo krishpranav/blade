@@ -47,6 +47,8 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
           output_mint: outputMint,
           amount: Number(amount),
           slippage,
+          jito_tip_sol: jitoTip,
+          anti_mev: antiMev,
         }),
       });
       if (!res.ok) throw new Error("Swap failed");

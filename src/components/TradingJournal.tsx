@@ -160,13 +160,30 @@ export const TradingJournal = memo(function TradingJournal({
       {/* Add Form */}
       {isAdding && (
         <div className="border-b border-neutral-800 p-4 space-y-3 bg-[#0a0a0a]">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
+            <div className="flex rounded-sm border border-neutral-800 bg-black p-0.5">
+              {(["long", "short"] as const).map((dir) => (
+                <button
+                  key={dir}
+                  onClick={() => setForm((p) => ({ ...p, direction: dir }))}
+                  className={`flex-1 rounded-sm py-1 text-[9px] font-bold uppercase transition-none ${
+                    form.direction === dir
+                      ? dir === "long"
+                        ? "bg-bull/20 text-bull"
+                        : "bg-bear/20 text-bear"
+                      : "text-neutral-500 hover:text-white"
+                  }`}
+                >
+                  {dir}
+                </button>
+              ))}
+            </div>
             <input
               type="text"
               placeholder="Symbol"
               value={form.tokenSymbol}
               onChange={(e) => setForm((p) => ({ ...p, tokenSymbol: e.target.value }))}
-              className="col-span-1 rounded-sm border border-neutral-800 bg-black px-2 py-1.5 font-mono text-[11px] text-white outline-none placeholder:text-neutral-700 focus:border-violet/50"
+              className="rounded-sm border border-neutral-800 bg-black px-2 py-1.5 font-mono text-[11px] text-white outline-none placeholder:text-neutral-700 focus:border-violet/50"
             />
             <input
               type="number"

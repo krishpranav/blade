@@ -24,6 +24,12 @@ export const RiskCalculator = memo(function RiskCalculator({
   const [entryPrice, setEntryPrice] = useState(currentPriceUsd > 0 ? currentPriceUsd.toFixed(8) : "0.005");
   const [isExpanded, setIsExpanded] = useState(true);
 
+  React.useEffect(() => {
+    if (currentPriceUsd > 0) {
+      setEntryPrice(currentPriceUsd.toFixed(8));
+    }
+  }, [currentPriceUsd]);
+
   const result: CalcResult | null = (() => {
     const port = parseFloat(portfolioUsd);
     const rPct = parseFloat(riskPct) / 100;

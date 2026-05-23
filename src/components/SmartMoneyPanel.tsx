@@ -78,7 +78,7 @@ const IntelRow = memo(({ ev }: { ev: IntelEvent }) => (
           )}
         </div>
         <span className="text-[9px] text-neutral-500 font-mono">
-          {new Date(ev.timestamp).toLocaleTimeString([], { hour12: false, second: '2-digit' })}
+          {new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
         </span>
       </div>
     </div>
