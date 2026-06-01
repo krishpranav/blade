@@ -1,6 +1,7 @@
 import React, { useState, useEffect, memo } from "react";
 import { Globe, TrendingUp, TrendingDown, Zap, BarChart2 } from "lucide-react";
 import { compact, fmtUsd, fmtPct, pctClass } from "@/lib/format";
+import { getBackendMarketSnapshot } from "@/server/solana";
 
 type MarketStat = {
   label: string;
@@ -36,13 +37,56 @@ export const MarketOverviewBar = memo(function MarketOverviewBar() {
   const [solPrice, setSolPrice] = useState(148.42);
 
   useEffect(() => {
-    const update = () => {
+    const update = async () => {
+      try {
+        const snapshot = await getBackendMarketSnapshot();
+        setSolPrice(snapshot.sol_price_usd);
+        setFearScore(snapshot.fear_greed_score);
+        setStats([
+          {
+            label: "SOL",
+            value: fmtUsd(snapshot.sol_price_usd),
+            change: (Math.random() - 0.5) * 4,
+            highlight: true,
+          },
+          { label: "Sol Vol 24h", value: `$${compact(snapshot.total_volume_24h_usd)}` },
+          { label: "New Pairs 1h", value: snapshot.new_pairs_1h.toLocaleString() },
+          {
+            label: "Dex Txns 24h",
+            value: compact(8_200_000 + Math.floor(Math.random() * 100_000)),
+          },
+          { label: "Active Traders", value: compact(snapshot.active_traders) },
+        ]);
+        setGainers(
+          snapshot.top_gainers.map((asset) => ({
+            symbol: asset.symbol,
+            pct: asset.change_24h_pct,
+            priceUsd: asset.price_usd,
+          })),
+        );
+        setLosers(
+          snapshot.top_losers.map((asset) => ({
+            symbol: asset.symbol,
+            pct: asset.change_24h_pct,
+            priceUsd: asset.price_usd,
+          })),
+        );
+        return;
+      } catch {
+        // Fall back to local simulation when the Rust backend is not running.
+      }
+
       const newSolPrice = 148.42 + (Math.random() - 0.5) * 2;
       setSolPrice(newSolPrice);
       setFearScore((prev) => Math.min(100, Math.max(0, prev + (Math.random() - 0.5) * 3)));
 
       setStats([
-        { label: "SOL", value: `$${newSolPrice.toFixed(2)}`, change: (Math.random() - 0.5) * 4, highlight: true },
+        {
+          label: "SOL",
+          value: `$${newSolPrice.toFixed(2)}`,
+          change: (Math.random() - 0.5) * 4,
+          highlight: true,
+        },
         { label: "Sol Vol 24h", value: `$${compact(2_840_000_000 + Math.random() * 100_000_000)}` },
         { label: "New Pairs 1h", value: `${412 + Math.round(Math.random() * 30)}` },
         { label: "Dex Txns 24h", value: compact(8_200_000 + Math.floor(Math.random() * 100_000)) },
@@ -72,12 +116,12 @@ export const MarketOverviewBar = memo(function MarketOverviewBar() {
     fearScore <= 25
       ? "text-bear"
       : fearScore <= 45
-      ? "text-orange-400"
-      : fearScore <= 55
-      ? "text-neutral-400"
-      : fearScore <= 75
-      ? "text-bull"
-      : "text-emerald-400";
+        ? "text-orange-400"
+        : fearScore <= 55
+          ? "text-neutral-400"
+          : fearScore <= 75
+            ? "text-bull"
+            : "text-emerald-400";
 
   return (
     <div className="rounded-sm border border-neutral-800 bg-[#0a0a0a] shadow-none">
@@ -93,12 +137,17 @@ export const MarketOverviewBar = memo(function MarketOverviewBar() {
           {/* Stats */}
           {stats.map((stat) => (
             <div key={stat.label} className={`px-4 py-2.5 ${stat.highlight ? "bg-violet/5" : ""}`}>
-              <div className="text-[9px] uppercase tracking-widest text-neutral-600">{stat.label}</div>
+              <div className="text-[9px] uppercase tracking-widest text-neutral-600">
+                {stat.label}
+              </div>
               <div className="mt-0.5 flex items-center gap-2">
                 <span className="font-mono text-[12px] font-semibold text-white">{stat.value}</span>
                 {stat.change !== undefined && (
-                  <span className={`font-mono text-[10px] ${stat.change >= 0 ? "text-bull" : "text-bear"}`}>
-                    {stat.change >= 0 ? "+" : ""}{stat.change.toFixed(2)}%
+                  <span
+                    className={`font-mono text-[10px] ${stat.change >= 0 ? "text-bull" : "text-bear"}`}
+                  >
+                    {stat.change >= 0 ? "+" : ""}
+                    {stat.change.toFixed(2)}%
                   </span>
                 )}
               </div>
@@ -107,7 +156,9 @@ export const MarketOverviewBar = memo(function MarketOverviewBar() {
 
           {/* Fear & Greed */}
           <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-widest text-neutral-600">Fear & Greed</div>
+            <div className="text-[9px] uppercase tracking-widest text-neutral-600">
+              Fear & Greed
+            </div>
             <div className="mt-0.5 flex items-center gap-1.5">
               <span className={`font-mono text-[16px] font-black leading-none ${fearColor}`}>
                 {Math.round(fearScore)}
@@ -122,7 +173,9 @@ export const MarketOverviewBar = memo(function MarketOverviewBar() {
             <div className="flex flex-col gap-0.5">
               {gainers.map((g) => (
                 <div key={g.symbol} className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] font-semibold text-white w-14">{g.symbol}</span>
+                  <span className="font-mono text-[10px] font-semibold text-white w-14">
+                    {g.symbol}
+                  </span>
                   <span className="font-mono text-[10px] text-bull">+{g.pct.toFixed(1)}%</span>
                 </div>
               ))}
@@ -135,7 +188,9 @@ export const MarketOverviewBar = memo(function MarketOverviewBar() {
             <div className="flex flex-col gap-0.5">
               {losers.map((l) => (
                 <div key={l.symbol} className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] font-semibold text-white w-14">{l.symbol}</span>
+                  <span className="font-mono text-[10px] font-semibold text-white w-14">
+                    {l.symbol}
+                  </span>
                   <span className="font-mono text-[10px] text-bear">{l.pct.toFixed(1)}%</span>
                 </div>
               ))}

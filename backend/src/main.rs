@@ -5,17 +5,28 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tower_http::cors::{Any, CorsLayer};
-use std::{collections::HashMap, net::SocketAddr, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 
 // ─── Shared Types ────────────────────────────────────────────────────────────
 
 fn now_secs() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 
 fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }
 
 // ─── Quote / Swap ─────────────────────────────────────────────────────────────
@@ -67,7 +78,11 @@ async fn handle_quote(Json(payload): Json<QuoteRequest>) -> Json<QuoteResponse> 
         minimum_received: min_rec,
         price_impact: impact,
         fee: payload.amount * 0.001,
-        route: vec![payload.input_mint, "Raydium".to_string(), payload.output_mint],
+        route: vec![
+            payload.input_mint,
+            "Raydium".to_string(),
+            payload.output_mint,
+        ],
         quoted_at: now_ms(),
     })
 }
@@ -169,7 +184,11 @@ async fn handle_token_analytics(Path(mint): Path<String>) -> Json<TokenAnalytics
         top10_holder_pct: 12.0 + (seed as f64 % 18.0),
         is_honeypot: false,
         bundle_detected: seed % 5 == 0,
-        bundle_pct: if seed % 5 == 0 { 2.1 + (seed as f64 % 5.0) } else { 0.0 },
+        bundle_pct: if seed % 5 == 0 {
+            2.1 + (seed as f64 % 5.0)
+        } else {
+            0.0
+        },
         holder_count: 1200 + (seed as u32 * 47),
         analyzed_at: now_secs(),
     })
@@ -252,15 +271,115 @@ struct LeaderboardEntry {
 
 async fn handle_leaderboard() -> Json<Vec<LeaderboardEntry>> {
     Json(vec![
-        LeaderboardEntry { rank: 1, wallet: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU".to_string(), total_pnl_usd: 248_000.0, win_rate: 87.5, trades_30d: 312, best_win_usd: 48_000.0, avg_hold_minutes: 4.2, tags: vec!["sniper".to_string(), "micro-cap".to_string()] },
-        LeaderboardEntry { rank: 2, wallet: "4fYNw3dojWmQ4dXtSGE9epjRGy9GFyZH9yZ3s8ByX9t".to_string(), total_pnl_usd: 182_500.0, win_rate: 79.2, trades_30d: 205, best_win_usd: 32_000.0, avg_hold_minutes: 12.7, tags: vec!["dca".to_string(), "lp-trader".to_string()] },
-        LeaderboardEntry { rank: 3, wallet: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWh".to_string(), total_pnl_usd: 97_200.0, win_rate: 74.8, trades_30d: 178, best_win_usd: 21_500.0, avg_hold_minutes: 8.1, tags: vec!["degen".to_string()] },
-        LeaderboardEntry { rank: 4, wallet: "CuieVDEDtLo7FypjyQUsA6oWzRY1p4N7YNjU72pPxAuG".to_string(), total_pnl_usd: 63_400.0, win_rate: 71.1, trades_30d: 490, best_win_usd: 14_000.0, avg_hold_minutes: 1.8, tags: vec!["high-freq".to_string(), "sniper".to_string()] },
-        LeaderboardEntry { rank: 5, wallet: "GtE9aGjQ7DXKL5bCMhHgthM2TvmjWz1UzQ6b2ENMxPW".to_string(), total_pnl_usd: 41_200.0, win_rate: 68.9, trades_30d: 143, best_win_usd: 9_800.0, avg_hold_minutes: 22.4, tags: vec!["swing".to_string()] },
+        LeaderboardEntry {
+            rank: 1,
+            wallet: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU".to_string(),
+            total_pnl_usd: 248_000.0,
+            win_rate: 87.5,
+            trades_30d: 312,
+            best_win_usd: 48_000.0,
+            avg_hold_minutes: 4.2,
+            tags: vec!["sniper".to_string(), "micro-cap".to_string()],
+        },
+        LeaderboardEntry {
+            rank: 2,
+            wallet: "4fYNw3dojWmQ4dXtSGE9epjRGy9GFyZH9yZ3s8ByX9t".to_string(),
+            total_pnl_usd: 182_500.0,
+            win_rate: 79.2,
+            trades_30d: 205,
+            best_win_usd: 32_000.0,
+            avg_hold_minutes: 12.7,
+            tags: vec!["dca".to_string(), "lp-trader".to_string()],
+        },
+        LeaderboardEntry {
+            rank: 3,
+            wallet: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWh".to_string(),
+            total_pnl_usd: 97_200.0,
+            win_rate: 74.8,
+            trades_30d: 178,
+            best_win_usd: 21_500.0,
+            avg_hold_minutes: 8.1,
+            tags: vec!["degen".to_string()],
+        },
+        LeaderboardEntry {
+            rank: 4,
+            wallet: "CuieVDEDtLo7FypjyQUsA6oWzRY1p4N7YNjU72pPxAuG".to_string(),
+            total_pnl_usd: 63_400.0,
+            win_rate: 71.1,
+            trades_30d: 490,
+            best_win_usd: 14_000.0,
+            avg_hold_minutes: 1.8,
+            tags: vec!["high-freq".to_string(), "sniper".to_string()],
+        },
+        LeaderboardEntry {
+            rank: 5,
+            wallet: "GtE9aGjQ7DXKL5bCMhHgthM2TvmjWz1UzQ6b2ENMxPW".to_string(),
+            total_pnl_usd: 41_200.0,
+            win_rate: 68.9,
+            trades_30d: 143,
+            best_win_usd: 9_800.0,
+            avg_hold_minutes: 22.4,
+            tags: vec!["swing".to_string()],
+        },
     ])
 }
 
 // ─── Health / Metrics ─────────────────────────────────────────────────────────
+
+#[derive(Serialize, Clone)]
+struct MarketSnapshotAsset {
+    symbol: String,
+    price_usd: f64,
+    change_24h_pct: f64,
+    volume_24h_usd: f64,
+}
+
+#[derive(Serialize)]
+struct MarketSnapshotResponse {
+    sol_price_usd: f64,
+    total_volume_24h_usd: f64,
+    active_traders: u32,
+    new_pairs_1h: u32,
+    fear_greed_score: u8,
+    top_gainers: Vec<MarketSnapshotAsset>,
+    top_losers: Vec<MarketSnapshotAsset>,
+    updated_at: u64,
+}
+
+async fn handle_market_snapshot(
+    State(state): State<Arc<AppState>>,
+) -> Json<MarketSnapshotResponse> {
+    let prices = state.current_prices.lock().unwrap();
+    let sol_price = *prices.get("SOL").unwrap_or(&178.42);
+    let mut assets: Vec<MarketSnapshotAsset> = prices
+        .iter()
+        .map(|(symbol, price)| {
+            let seed = symbol.bytes().fold(0u32, |acc, b| acc + b as u32) as f64;
+            let change = ((seed % 29.0) - 12.0) + fastrand::f64() * 2.0;
+            MarketSnapshotAsset {
+                symbol: symbol.clone(),
+                price_usd: *price,
+                change_24h_pct: change,
+                volume_24h_usd: 18_000_000.0 + seed * 950_000.0,
+            }
+        })
+        .collect();
+    assets.sort_by(|a, b| b.change_24h_pct.partial_cmp(&a.change_24h_pct).unwrap());
+    let top_gainers = assets.iter().take(3).cloned().collect();
+    let top_losers = assets.iter().rev().take(3).cloned().collect();
+    let total_volume = assets.iter().map(|asset| asset.volume_24h_usd).sum();
+
+    Json(MarketSnapshotResponse {
+        sol_price_usd: sol_price,
+        total_volume_24h_usd: total_volume,
+        active_traders: 142_000 + fastrand::u32(0..5_000),
+        new_pairs_1h: 410 + fastrand::u32(0..45),
+        fear_greed_score: 58 + fastrand::u8(0..18),
+        top_gainers,
+        top_losers,
+        updated_at: now_secs(),
+    })
+}
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -280,6 +399,7 @@ async fn handle_health() -> Json<HealthResponse> {
         uptime_secs: now_secs() - start,
         endpoints: vec![
             "/api/health".to_string(),
+            "/api/market/snapshot".to_string(),
             "/api/quote".to_string(),
             "/api/swap".to_string(),
             "/api/price-history/:mint".to_string(),
@@ -443,13 +563,16 @@ async fn handle_create_order(
     orders.push(order.clone());
 
     let mut logs = state.bot_logs.lock().unwrap();
-    logs.insert(0, format!(
-        "[{}] 📥 Order placed: {} {} at trigger ${:.6}",
-        now_secs(),
-        payload.order_type,
-        payload.token_symbol,
-        payload.trigger_price
-    ));
+    logs.insert(
+        0,
+        format!(
+            "[{}] 📥 Order placed: {} {} at trigger ${:.6}",
+            now_secs(),
+            payload.order_type,
+            payload.token_symbol,
+            payload.trigger_price
+        ),
+    );
 
     Json(order)
 }
@@ -465,20 +588,23 @@ async fn handle_cancel_order(
 ) -> Json<HashMap<String, bool>> {
     let mut orders = state.orders.lock().unwrap();
     let mut success = false;
-    
+
     if let Some(order) = orders.iter_mut().find(|o| o.id == payload.id) {
         order.status = "Cancelled".to_string();
         success = true;
 
         let mut logs = state.bot_logs.lock().unwrap();
-        logs.insert(0, format!(
-            "[{}] ✕ Order cancelled: {} for {}",
-            now_secs(),
-            order.order_type,
-            order.token_symbol
-        ));
+        logs.insert(
+            0,
+            format!(
+                "[{}] ✕ Order cancelled: {} for {}",
+                now_secs(),
+                order.order_type,
+                order.token_symbol
+            ),
+        );
     }
-    
+
     orders.retain(|o| o.id != payload.id);
 
     let mut res = HashMap::new();
@@ -512,12 +638,15 @@ async fn handle_close_position(
         };
 
         let mut logs = state.bot_logs.lock().unwrap();
-        logs.insert(0, format!(
-            "[{}] 🚪 Closed position: {} (PnL: {})",
-            now_secs(),
-            pos.token_symbol,
-            pnl_str
-        ));
+        logs.insert(
+            0,
+            format!(
+                "[{}] 🚪 Closed position: {} (PnL: {})",
+                now_secs(),
+                pos.token_symbol,
+                pnl_str
+            ),
+        );
     }
 
     positions.retain(|p| p.id != payload.id);
@@ -547,7 +676,13 @@ async fn start_background_simulation(state: Arc<AppState>) {
         // 1. Update Prices
         let mut prices = state.current_prices.lock().unwrap();
         for (sym, price) in prices.iter_mut() {
-            let volatility = if sym == "SOL" { 0.005 } else if sym == "BTC" { 0.002 } else { 0.03 };
+            let volatility = if sym == "SOL" {
+                0.005
+            } else if sym == "BTC" {
+                0.002
+            } else {
+                0.03
+            };
             let change = (fastrand::f64() - 0.49) * volatility * *price;
             *price = (*price + change).max(0.000001);
         }
@@ -576,7 +711,9 @@ async fn start_background_simulation(state: Arc<AppState>) {
             let mut filled_indices = Vec::new();
 
             for (idx, order) in orders.iter_mut().enumerate() {
-                if order.status != "Open" { continue; }
+                if order.status != "Open" {
+                    continue;
+                }
 
                 if let Some(price) = current_prices.get(&order.token_symbol) {
                     let mut should_fill = false;
@@ -606,13 +743,16 @@ async fn start_background_simulation(state: Arc<AppState>) {
                             created_at: now_secs(),
                         });
 
-                        logs.insert(0, format!(
-                            "[{}] 🚀 Filled order: {} {} at ${:.6}",
-                            now_secs(),
-                            order.order_type,
-                            order.token_symbol,
-                            price
-                        ));
+                        logs.insert(
+                            0,
+                            format!(
+                                "[{}] 🚀 Filled order: {} {} at ${:.6}",
+                                now_secs(),
+                                order.order_type,
+                                order.token_symbol,
+                                price
+                            ),
+                        );
                     }
                 }
             }
@@ -635,9 +775,19 @@ async fn start_background_simulation(state: Arc<AppState>) {
                     let diff = base_price * (0.005 + fastrand::f64() * 0.02);
                     let is_buy_raydium = fastrand::bool();
                     let (buy_dex, sell_dex, buy_price, sell_price) = if is_buy_raydium {
-                        (dexes[0], dexes[1], *base_price - diff/2.0, *base_price + diff/2.0)
+                        (
+                            dexes[0],
+                            dexes[1],
+                            *base_price - diff / 2.0,
+                            *base_price + diff / 2.0,
+                        )
                     } else {
-                        (dexes[1], dexes[2], *base_price - diff/2.0, *base_price + diff/2.0)
+                        (
+                            dexes[1],
+                            dexes[2],
+                            *base_price - diff / 2.0,
+                            *base_price + diff / 2.0,
+                        )
                     };
 
                     let profit_pct = (sell_price / buy_price - 1.0) * 100.0;
@@ -663,13 +813,28 @@ async fn start_background_simulation(state: Arc<AppState>) {
             let mut logs = state.bot_logs.lock().unwrap();
             let random = fastrand::u8(0..10);
             if random == 0 {
-                logs.insert(0, format!("[{}] ⚡ New token pair detected on Raydium. Scanning safety...", now_secs()));
+                logs.insert(
+                    0,
+                    format!(
+                        "[{}] ⚡ New token pair detected on Raydium. Scanning safety...",
+                        now_secs()
+                    ),
+                );
             } else if random == 1 {
                 logs.insert(0, format!("[{}] 🛡 Liquidity lock audit: PASS", now_secs()));
             } else if random == 2 {
-                logs.insert(0, format!("[{}] 🔎 Scanning Solana mempool for large orders...", now_secs()));
+                logs.insert(
+                    0,
+                    format!(
+                        "[{}] 🔎 Scanning Solana mempool for large orders...",
+                        now_secs()
+                    ),
+                );
             } else if random == 3 {
-                logs.insert(0, format!("[{}] 💎 Whale wallet copy-trade triggered.", now_secs()));
+                logs.insert(
+                    0,
+                    format!("[{}] 💎 Whale wallet copy-trade triggered.", now_secs()),
+                );
             }
             if logs.len() > 50 {
                 logs.truncate(50);
@@ -696,6 +861,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/health", get(handle_health))
+        .route("/api/market/snapshot", get(handle_market_snapshot))
         .route("/api/quote", post(handle_quote))
         .route("/api/swap", post(handle_swap))
         .route("/api/price-history/:mint", get(handle_price_history))
@@ -703,7 +869,10 @@ async fn main() {
         .route("/api/portfolio", post(handle_portfolio))
         .route("/api/leaderboard", get(handle_leaderboard))
         // Orders API
-        .route("/api/orders", get(handle_get_orders).post(handle_create_order))
+        .route(
+            "/api/orders",
+            get(handle_get_orders).post(handle_create_order),
+        )
         .route("/api/orders/cancel", post(handle_cancel_order))
         // Positions API
         .route("/api/positions", get(handle_get_positions))
@@ -719,7 +888,9 @@ async fn main() {
     println!("   Endpoints: /api/health | /api/quote | /api/swap");
     println!("             /api/price-history/:mint | /api/analytics/:mint");
     println!("             /api/portfolio | /api/leaderboard");
-    println!("             /api/orders | /api/orders/cancel | /api/positions | /api/positions/close");
+    println!(
+        "             /api/orders | /api/orders/cancel | /api/positions | /api/positions/close"
+    );
     println!("             /api/arbitrage | /api/bot/logs");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

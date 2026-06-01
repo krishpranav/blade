@@ -1,5 +1,6 @@
 const DEX = "https://api.dexscreener.com";
 const RPC = "https://api.mainnet-beta.solana.com";
+const BACKEND = "http://127.0.0.1:3000";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 type TokenSignal = {
@@ -51,6 +52,37 @@ export type DSPair = {
     socials?: { type: string; url: string }[];
   };
 };
+
+export type BackendMarketAsset = {
+  symbol: string;
+  price_usd: number;
+  change_24h_pct: number;
+  volume_24h_usd: number;
+};
+
+export type BackendMarketSnapshot = {
+  sol_price_usd: number;
+  total_volume_24h_usd: number;
+  active_traders: number;
+  new_pairs_1h: number;
+  fear_greed_score: number;
+  top_gainers: BackendMarketAsset[];
+  top_losers: BackendMarketAsset[];
+  updated_at: number;
+};
+
+async function backendFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BACKEND}${path}`, {
+    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+    ...init,
+  });
+  if (!res.ok) throw new Error(`Blade backend ${res.status}`);
+  return res.json();
+}
+
+export async function getBackendMarketSnapshot(): Promise<BackendMarketSnapshot> {
+  return backendFetch<BackendMarketSnapshot>("/api/market/snapshot");
+}
 
 async function dsFetch(path: string): Promise<unknown> {
   const res = await fetch(`${DEX}${path}`, {
