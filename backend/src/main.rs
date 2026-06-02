@@ -406,6 +406,8 @@ async fn handle_health() -> Json<HealthResponse> {
             "/api/analytics/:mint".to_string(),
             "/api/portfolio".to_string(),
             "/api/leaderboard".to_string(),
+            "/api/alerts".to_string(),
+            "/api/alerts/delete".to_string(),
             "/api/orders".to_string(),
             "/api/orders/cancel".to_string(),
             "/api/positions".to_string(),
@@ -455,9 +457,22 @@ struct ArbitrageOpp {
     timestamp: u64,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct PriceAlert {
+    id: String,
+    token_symbol: String,
+    condition: String,
+    target_value: f64,
+    baseline_price: f64,
+    triggered: bool,
+    created_at: u64,
+    note: Option<String>,
+}
+
 struct AppState {
     orders: Mutex<Vec<Order>>,
     positions: Mutex<Vec<Position>>,
+    alerts: Mutex<Vec<PriceAlert>>,
     bot_logs: Mutex<Vec<String>>,
     arbitrage_opportunities: Mutex<Vec<ArbitrageOpp>>,
     current_prices: Mutex<HashMap<String, f64>>,
@@ -520,6 +535,7 @@ impl Default for AppState {
         Self {
             orders: Mutex::new(orders),
             positions: Mutex::new(positions),
+            alerts: Mutex::new(vec![]),
             bot_logs: Mutex::new(vec![
                 format!("[{}] 🤖 System matching engine initialized.", now_secs()),
                 format!("[{}] 🔎 Sniper Bot scanning mempool...", now_secs()),
@@ -666,6 +682,56 @@ async fn handle_get_bot_logs(State(state): State<Arc<AppState>>) -> Json<Vec<Str
     Json(logs.clone())
 }
 
+async fn handle_get_alerts(State(state): State<Arc<AppState>>) -> Json<Vec<PriceAlert>> {
+    let alerts = state.alerts.lock().unwrap();
+    Json(alerts.clone())
+}
+
+#[derive(Deserialize)]
+struct CreateAlertRequest {
+    token_symbol: String,
+    condition: String,
+    target_value: f64,
+    baseline_price: f64,
+    note: Option<String>,
+}
+
+async fn handle_create_alert(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateAlertRequest>,
+) -> Json<PriceAlert> {
+    let alert = PriceAlert {
+        id: format!("alert_{}", now_ms()),
+        token_symbol: payload.token_symbol,
+        condition: payload.condition,
+        target_value: payload.target_value,
+        baseline_price: payload.baseline_price,
+        triggered: false,
+        created_at: now_ms(),
+        note: payload.note,
+    };
+    let mut alerts = state.alerts.lock().unwrap();
+    alerts.insert(0, alert.clone());
+    Json(alert)
+}
+
+#[derive(Deserialize)]
+struct DeleteAlertRequest {
+    id: String,
+}
+
+async fn handle_delete_alert(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<DeleteAlertRequest>,
+) -> Json<HashMap<String, bool>> {
+    let mut alerts = state.alerts.lock().unwrap();
+    let before = alerts.len();
+    alerts.retain(|alert| alert.id != payload.id);
+    let mut res = HashMap::new();
+    res.insert("success".to_string(), alerts.len() != before);
+    Json(res)
+}
+
 // ─── Simulation Task ────────────────────────────────────────────────────────
 
 async fn start_background_simulation(state: Arc<AppState>) {
@@ -699,6 +765,32 @@ async fn start_background_simulation(state: Arc<AppState>) {
                     let pnl_pct = (pos.current_price / pos.entry_price - 1.0) * 100.0;
                     pos.pnl_pct = pnl_pct;
                     pos.pnl_usd = pos.size_usd * (pnl_pct / 100.0);
+                }
+            }
+        }
+
+        // 3a. Evaluate server-side price alerts
+        {
+            let mut alerts = state.alerts.lock().unwrap();
+            for alert in alerts.iter_mut() {
+                if alert.triggered {
+                    continue;
+                }
+                if let Some(price) = current_prices.get(&alert.token_symbol) {
+                    let should_trigger = match alert.condition.as_str() {
+                        "above" => *price >= alert.target_value,
+                        "below" => *price <= alert.target_value,
+                        "pct_gain" => {
+                            *price >= alert.baseline_price * (1.0 + alert.target_value / 100.0)
+                        }
+                        "pct_loss" => {
+                            *price <= alert.baseline_price * (1.0 - alert.target_value / 100.0)
+                        }
+                        _ => false,
+                    };
+                    if should_trigger {
+                        alert.triggered = true;
+                    }
                 }
             }
         }
@@ -868,6 +960,11 @@ async fn main() {
         .route("/api/analytics/:mint", get(handle_token_analytics))
         .route("/api/portfolio", post(handle_portfolio))
         .route("/api/leaderboard", get(handle_leaderboard))
+        .route(
+            "/api/alerts",
+            get(handle_get_alerts).post(handle_create_alert),
+        )
+        .route("/api/alerts/delete", post(handle_delete_alert))
         // Orders API
         .route(
             "/api/orders",

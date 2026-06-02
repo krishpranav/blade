@@ -71,6 +71,17 @@ export type BackendMarketSnapshot = {
   updated_at: number;
 };
 
+export type BackendPriceAlert = {
+  id: string;
+  token_symbol: string;
+  condition: "above" | "below" | "pct_gain" | "pct_loss";
+  target_value: number;
+  baseline_price: number;
+  triggered: boolean;
+  created_at: number;
+  note?: string;
+};
+
 async function backendFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BACKEND}${path}`, {
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
@@ -82,6 +93,30 @@ async function backendFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function getBackendMarketSnapshot(): Promise<BackendMarketSnapshot> {
   return backendFetch<BackendMarketSnapshot>("/api/market/snapshot");
+}
+
+export async function getBackendAlerts(): Promise<BackendPriceAlert[]> {
+  return backendFetch<BackendPriceAlert[]>("/api/alerts");
+}
+
+export async function createBackendAlert(data: {
+  token_symbol: string;
+  condition: BackendPriceAlert["condition"];
+  target_value: number;
+  baseline_price: number;
+  note?: string;
+}): Promise<BackendPriceAlert> {
+  return backendFetch<BackendPriceAlert>("/api/alerts", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteBackendAlert(id: string): Promise<{ success: boolean }> {
+  return backendFetch<{ success: boolean }>("/api/alerts/delete", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
 }
 
 async function dsFetch(path: string): Promise<unknown> {

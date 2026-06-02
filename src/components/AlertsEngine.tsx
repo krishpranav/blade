@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, memo } from "react";
 import { Bell, BellOff, Plus, Trash2, CheckCircle2, AlertCircle, Zap } from "lucide-react";
 import { fmtUsd } from "@/lib/format";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createBackendAlert, deleteBackendAlert, getBackendAlerts } from "@/server/solana";
 
 type AlertCondition = "above" | "below" | "pct_gain" | "pct_loss";
 
@@ -36,14 +38,54 @@ export const AlertsEngine = memo(function AlertsEngine({
   const [targetValue, setTargetValue] = useState<string>("");
   const [note, setNote] = useState<string>("");
   const [isExpanded, setIsExpanded] = useState(false);
-  const [triggeredIds, setTriggeredIds] = useState<Set<string>>(new Set());
+  const [, setTriggeredIds] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+
+  const alertsQuery = useQuery({
+    queryKey: ["backend-alerts"],
+    queryFn: () => getBackendAlerts(),
+    refetchInterval: 5_000,
+  });
+
+  useEffect(() => {
+    if (!alertsQuery.data) return;
+    const mapped = alertsQuery.data
+      .filter((alert) => alert.token_symbol === tokenSymbol)
+      .map((alert) => ({
+        id: alert.id,
+        tokenSymbol: alert.token_symbol,
+        condition: alert.condition,
+        targetValue: alert.target_value,
+        baselinePrice: alert.baseline_price,
+        triggered: alert.triggered,
+        createdAt: alert.created_at,
+        note: alert.note,
+      }));
+    setAlerts(mapped);
+  }, [alertsQuery.data, tokenSymbol]);
+
+  const createAlertMutation = useMutation({
+    mutationFn: (alert: Omit<PriceAlert, "id" | "createdAt" | "triggered">) =>
+      createBackendAlert({
+        token_symbol: alert.tokenSymbol,
+        condition: alert.condition,
+        target_value: alert.targetValue,
+        baseline_price: alert.baselinePrice,
+        note: alert.note,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backend-alerts"] }),
+  });
+
+  const deleteAlertMutation = useMutation({
+    mutationFn: (id: string) => deleteBackendAlert(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backend-alerts"] }),
+  });
 
   // Real-time alert evaluation engine
   useEffect(() => {
     if (!currentPriceUsd || alerts.length === 0) return;
 
-    const newlyTriggered = new Set<string>(triggeredIds);
-    let changed = false;
+    const triggeredNow: string[] = [];
 
     alerts.forEach((alert) => {
       if (alert.triggered) return;
@@ -64,10 +106,8 @@ export const AlertsEngine = memo(function AlertsEngine({
           break;
       }
 
-      if (shouldTrigger && !newlyTriggered.has(alert.id)) {
-        newlyTriggered.add(alert.id);
-        changed = true;
-
+      if (shouldTrigger) {
+        triggeredNow.push(alert.id);
         // Browser notification
         if ("Notification" in window && Notification.permission === "granted") {
           new Notification(`🔔 Blade Alert: ${alert.tokenSymbol}`, {
@@ -82,13 +122,13 @@ export const AlertsEngine = memo(function AlertsEngine({
       }
     });
 
-    if (changed) {
-      setTriggeredIds(newlyTriggered);
+    if (triggeredNow.length > 0) {
+      setTriggeredIds((prev) => new Set([...prev, ...triggeredNow]));
       setAlerts((prev) =>
         prev.map((a) => ({
           ...a,
-          triggered: newlyTriggered.has(a.id) ? true : a.triggered,
-        }))
+          triggered: triggeredNow.includes(a.id) ? true : a.triggered,
+        })),
       );
     }
   }, [currentPriceUsd, alerts]);
@@ -103,24 +143,25 @@ export const AlertsEngine = memo(function AlertsEngine({
     const value = parseFloat(targetValue);
     if (isNaN(value) || value <= 0) return;
 
-    const newAlert: PriceAlert = {
-      id: Math.random().toString(36).substring(7),
+    const newAlert = {
       tokenSymbol,
       condition,
       targetValue: value,
       baselinePrice: currentPriceUsd || value,
-      triggered: false,
-      createdAt: Date.now(),
       note: note.trim() || undefined,
     };
-    setAlerts((prev) => [newAlert, ...prev]);
+    createAlertMutation.mutate(newAlert);
     setTargetValue("");
     setNote("");
-  }, [condition, targetValue, note, tokenSymbol, currentPriceUsd]);
+  }, [condition, createAlertMutation, targetValue, note, tokenSymbol, currentPriceUsd]);
 
-  const removeAlert = useCallback((id: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
-  }, []);
+  const removeAlert = useCallback(
+    (id: string) => {
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+      deleteAlertMutation.mutate(id);
+    },
+    [deleteAlertMutation],
+  );
 
   const activeCount = alerts.filter((a) => !a.triggered).length;
   const triggeredCount = alerts.filter((a) => a.triggered).length;
@@ -174,13 +215,14 @@ export const AlertsEngine = memo(function AlertsEngine({
               </div>
               <div>
                 <label className="text-[9px] uppercase tracking-widest text-neutral-600">
-                  Target{" "}
-                  {condition.startsWith("pct") ? "%" : "USD"}
+                  Target {condition.startsWith("pct") ? "%" : "USD"}
                 </label>
                 <input
                   type="number"
                   step="any"
-                  placeholder={condition.startsWith("pct") ? "e.g. 20" : fmtUsd(currentPriceUsd * 1.1)}
+                  placeholder={
+                    condition.startsWith("pct") ? "e.g. 20" : fmtUsd(currentPriceUsd * 1.1)
+                  }
                   value={targetValue}
                   onChange={(e) => setTargetValue(e.target.value)}
                   className="mt-1 w-full rounded-sm border border-neutral-800 bg-[#0a0a0a] px-2 py-1.5 font-mono text-[11px] text-white outline-none placeholder:text-neutral-700 focus:border-violet/50"
@@ -197,7 +239,7 @@ export const AlertsEngine = memo(function AlertsEngine({
             <div className="flex gap-2">
               <button
                 onClick={addAlert}
-                disabled={!targetValue}
+                disabled={!targetValue || createAlertMutation.isPending}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-sm bg-violet/20 border border-violet/30 py-2 text-[10px] font-bold uppercase tracking-wider text-violet hover:bg-violet hover:text-white transition-none disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Plus className="h-3 w-3" /> Set Alert
@@ -218,9 +260,7 @@ export const AlertsEngine = memo(function AlertsEngine({
                 <div
                   key={alert.id}
                   className={`flex items-center justify-between rounded-sm border px-3 py-2 ${
-                    alert.triggered
-                      ? "border-bull/20 bg-bull/5"
-                      : "border-neutral-800 bg-[#0a0a0a]"
+                    alert.triggered ? "border-bull/20 bg-bull/5" : "border-neutral-800 bg-[#0a0a0a]"
                   }`}
                 >
                   <div className="flex items-center gap-2">
