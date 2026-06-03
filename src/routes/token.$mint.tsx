@@ -29,7 +29,6 @@ export function TokenPage() {
   const { mint } = useParams({ from: "/token/$mint" });
   const [searchOpen, setSearchOpen] = useState(false);
 
-
   const { data, isLoading } = useQuery({
     queryKey: ["token-pairs", mint],
     queryFn: () => getTokenPairs({ data: { mint } }),
@@ -105,7 +104,9 @@ export function TokenPage() {
           >
             <Command className="h-3 w-3" />
             <span>Search tokens</span>
-            <kbd className="rounded border border-neutral-800 bg-neutral-900 px-1 font-mono text-[9px]">⌘K</kbd>
+            <kbd className="rounded border border-neutral-800 bg-neutral-900 px-1 font-mono text-[9px]">
+              ⌘K
+            </kbd>
           </button>
         </div>
 
@@ -127,10 +128,14 @@ export function TokenPage() {
                   >
                     <div className="flex flex-col">
                       <span className="font-semibold text-white">{t.baseToken.symbol}</span>
-                      <span className="text-[10px] text-neutral-500">${compact(t.liquidity?.usd || 0)} Liq</span>
+                      <span className="text-[10px] text-neutral-500">
+                        ${compact(t.liquidity?.usd || 0)} Liq
+                      </span>
                     </div>
                     <div className="flex flex-col items-end">
-                      <span className="font-mono text-[12px]">{t.priceUsd ? fmtUsd(parseFloat(t.priceUsd)) : "—"}</span>
+                      <span className="font-mono text-[12px]">
+                        {t.priceUsd ? fmtUsd(parseFloat(t.priceUsd)) : "—"}
+                      </span>
                       <span className={"font-mono text-[11px] " + pctClass(t.priceChange?.h24)}>
                         {fmtPct(t.priceChange?.h24)}
                       </span>
@@ -145,7 +150,11 @@ export function TokenPage() {
           <div className="flex flex-col gap-3 h-full contain-layout">
             <div className="flex flex-wrap items-center gap-4 rounded-sm border border-neutral-800 bg-black p-4 shadow-none">
               {top.info?.imageUrl ? (
-                <img src={top.info.imageUrl} alt="" className="h-12 w-12 rounded-sm bg-[#1a1a1a] object-cover" />
+                <img
+                  src={top.info.imageUrl}
+                  alt=""
+                  className="h-12 w-12 rounded-sm bg-[#1a1a1a] object-cover"
+                />
               ) : (
                 <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-violet/20 text-sm font-semibold text-violet">
                   {top.baseToken.symbol.slice(0, 3)}
@@ -153,7 +162,9 @@ export function TokenPage() {
               )}
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="font-display text-xl font-semibold tracking-tight text-white">{top.baseToken.symbol}</h1>
+                  <h1 className="font-display text-xl font-semibold tracking-tight text-white">
+                    {top.baseToken.symbol}
+                  </h1>
                   <span className="rounded-sm bg-[#1a1a1a] px-1.5 py-0.5 text-[10px] uppercase text-neutral-500 border border-neutral-800">
                     {top.dexId}
                   </span>
@@ -168,7 +179,9 @@ export function TokenPage() {
               <div className="ml-auto flex gap-3 text-right">
                 <div>
                   <div className="text-[10px] uppercase text-neutral-500">Price</div>
-                  <div className="font-mono text-lg font-semibold text-white">{price ? fmtUsd(price) : "—"}</div>
+                  <div className="font-mono text-lg font-semibold text-white">
+                    {price ? fmtUsd(price) : "—"}
+                  </div>
                 </div>
                 <div>
                   <div className="text-[10px] uppercase text-neutral-500">24h</div>
@@ -178,8 +191,14 @@ export function TokenPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-              <Cell label="Liquidity" value={top.liquidity?.usd ? "$" + compact(top.liquidity.usd) : "—"} />
-              <Cell label="Volume 24h" value={top.volume?.h24 ? "$" + compact(top.volume.h24) : "—"} />
+              <Cell
+                label="Liquidity"
+                value={top.liquidity?.usd ? "$" + compact(top.liquidity.usd) : "—"}
+              />
+              <Cell
+                label="Volume 24h"
+                value={top.volume?.h24 ? "$" + compact(top.volume.h24) : "—"}
+              />
               <Cell label="Market Cap" value={top.marketCap ? "$" + compact(top.marketCap) : "—"} />
               <Cell label="FDV" value={top.fdv ? "$" + compact(top.fdv) : "—"} />
               <Cell label="Trades" value={total ? total.toLocaleString() : "—"} />
@@ -188,7 +207,7 @@ export function TokenPage() {
             <div className="flex h-[400px] flex-col overflow-hidden rounded-sm border border-neutral-800 bg-black shadow-none contain-strict relative">
               <NativeChart width={800} height={400} />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="flex h-[380px] flex-col overflow-hidden rounded-sm shadow-none contain-strict">
                 <TradeHistory currentPriceUsd={price || 0.005} />
@@ -208,12 +227,11 @@ export function TokenPage() {
 
             <AlertsEngine tokenSymbol={top.baseToken.symbol} currentPriceUsd={price || 0} />
 
+            <TokenSecurityPanel tokenSymbol={top.baseToken.symbol} mint={mint} />
+
             <RiskCalculator currentPriceUsd={price || 0} />
 
-            <WalletHoldings 
-              tokenSymbol={top.baseToken.symbol} 
-              currentPriceUsd={price || 0} 
-            />
+            <WalletHoldings tokenSymbol={top.baseToken.symbol} currentPriceUsd={price || 0} />
 
             <DeepRiskAnalyzer tokenSymbol={top.baseToken.symbol} />
 
@@ -221,7 +239,9 @@ export function TokenPage() {
             <div className="rounded-sm border border-neutral-800 bg-black p-4 shadow-none">
               <div className="mb-2 flex justify-between text-[11px] text-neutral-500 uppercase tracking-widest">
                 <span>Buy pressure (24h)</span>
-                <span>{buys24.toLocaleString()} / {sells24.toLocaleString()}</span>
+                <span>
+                  {buys24.toLocaleString()} / {sells24.toLocaleString()}
+                </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-sm bg-bear/30">
                 <div className="h-full bg-bull transition-none" style={{ width: buyPct + "%" }} />
@@ -284,5 +304,3 @@ function Row({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-

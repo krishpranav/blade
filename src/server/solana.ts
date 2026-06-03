@@ -82,6 +82,22 @@ export type BackendPriceAlert = {
   note?: string;
 };
 
+export type BackendRiskRule = {
+  id: string;
+  label: string;
+  passed: boolean;
+  severity: "critical" | "high" | "medium" | string;
+  detail: string;
+};
+
+export type BackendRiskRules = {
+  mint: string;
+  score: number;
+  verdict: string;
+  rules: BackendRiskRule[];
+  generated_at: number;
+};
+
 async function backendFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BACKEND}${path}`, {
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
@@ -117,6 +133,10 @@ export async function deleteBackendAlert(id: string): Promise<{ success: boolean
     method: "POST",
     body: JSON.stringify({ id }),
   });
+}
+
+export async function getBackendRiskRules(mint: string): Promise<BackendRiskRules> {
+  return backendFetch<BackendRiskRules>(`/api/risk-rules/${encodeURIComponent(mint)}`);
 }
 
 async function dsFetch(path: string): Promise<unknown> {

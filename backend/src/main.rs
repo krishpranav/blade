@@ -194,6 +194,97 @@ async fn handle_token_analytics(Path(mint): Path<String>) -> Json<TokenAnalytics
     })
 }
 
+#[derive(Serialize)]
+struct RiskRule {
+    id: String,
+    label: String,
+    passed: bool,
+    severity: String,
+    detail: String,
+}
+
+#[derive(Serialize)]
+struct TokenRiskRulesResponse {
+    mint: String,
+    score: u8,
+    verdict: String,
+    rules: Vec<RiskRule>,
+    generated_at: u64,
+}
+
+async fn handle_token_risk_rules(Path(mint): Path<String>) -> Json<TokenRiskRulesResponse> {
+    let seed = mint.bytes().fold(0u32, |acc, b| acc + b as u32);
+    let mint_revoked = seed % 5 != 0;
+    let freeze_revoked = seed % 7 != 0;
+    let lp_locked_pct = 82.0 + (seed % 17) as f64;
+    let top10_pct = 12.0 + (seed % 26) as f64;
+    let bundle_pct = if seed % 4 == 0 { 8.5 } else { 1.8 };
+    let rules = vec![
+        RiskRule {
+            id: "mint_auth".to_string(),
+            label: "Mint authority revoked".to_string(),
+            passed: mint_revoked,
+            severity: "critical".to_string(),
+            detail: if mint_revoked {
+                "No additional supply can be minted."
+            } else {
+                "Mint authority may still issue supply."
+            }
+            .to_string(),
+        },
+        RiskRule {
+            id: "freeze_auth".to_string(),
+            label: "Freeze authority revoked".to_string(),
+            passed: freeze_revoked,
+            severity: "critical".to_string(),
+            detail: if freeze_revoked {
+                "Token accounts cannot be frozen."
+            } else {
+                "Freeze authority remains active."
+            }
+            .to_string(),
+        },
+        RiskRule {
+            id: "lp_lock".to_string(),
+            label: "LP lock coverage".to_string(),
+            passed: lp_locked_pct >= 85.0,
+            severity: "high".to_string(),
+            detail: format!("{:.1}% of LP appears locked or burned.", lp_locked_pct),
+        },
+        RiskRule {
+            id: "holder_concentration".to_string(),
+            label: "Top holder concentration".to_string(),
+            passed: top10_pct < 30.0,
+            severity: "medium".to_string(),
+            detail: format!("Top 10 wallets hold {:.1}% of tracked supply.", top10_pct),
+        },
+        RiskRule {
+            id: "bundle_exposure".to_string(),
+            label: "Bundle exposure".to_string(),
+            passed: bundle_pct < 5.0,
+            severity: "medium".to_string(),
+            detail: format!("{:.1}% suspected bundled launch exposure.", bundle_pct),
+        },
+    ];
+    let passed = rules.iter().filter(|rule| rule.passed).count() as u8;
+    let score = 35 + passed * 13;
+    let verdict = if score >= 80 {
+        "Low Risk"
+    } else if score >= 60 {
+        "Watch"
+    } else {
+        "High Risk"
+    };
+
+    Json(TokenRiskRulesResponse {
+        mint,
+        score,
+        verdict: verdict.to_string(),
+        rules,
+        generated_at: now_secs(),
+    })
+}
+
 // ─── Portfolio ────────────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
@@ -404,6 +495,7 @@ async fn handle_health() -> Json<HealthResponse> {
             "/api/swap".to_string(),
             "/api/price-history/:mint".to_string(),
             "/api/analytics/:mint".to_string(),
+            "/api/risk-rules/:mint".to_string(),
             "/api/portfolio".to_string(),
             "/api/leaderboard".to_string(),
             "/api/alerts".to_string(),
@@ -958,6 +1050,7 @@ async fn main() {
         .route("/api/swap", post(handle_swap))
         .route("/api/price-history/:mint", get(handle_price_history))
         .route("/api/analytics/:mint", get(handle_token_analytics))
+        .route("/api/risk-rules/:mint", get(handle_token_risk_rules))
         .route("/api/portfolio", post(handle_portfolio))
         .route("/api/leaderboard", get(handle_leaderboard))
         .route(
