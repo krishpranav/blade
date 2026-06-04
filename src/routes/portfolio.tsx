@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { getWalletHoldings, getTokensInfo } from "@/server/solana";
+import { getBackendRebalancePlan, getWalletHoldings, getTokensInfo } from "@/server/solana";
 import { compact, fmtUsd, shortAddr } from "@/lib/format";
 import { Wallet, Search, AlertTriangle, ShieldCheck, PieChart } from "lucide-react";
 
@@ -82,6 +82,27 @@ export function PortfolioPage() {
   );
   const riskLabel =
     portfolioScore >= 75 ? "Balanced" : portfolioScore >= 55 ? "Watch" : "Concentrated";
+
+  const { data: rebalancePlan } = useQuery({
+    queryKey: [
+      "rebalance-plan",
+      wallet,
+      total,
+      topHolding?.symbol,
+      topAllocation,
+      stableAllocation,
+    ],
+    queryFn: () =>
+      getBackendRebalancePlan({
+        wallet,
+        total_value_usd: total,
+        largest_symbol: topHolding?.symbol,
+        largest_allocation_pct: topAllocation,
+        stable_allocation_pct: stableAllocation,
+      }),
+    enabled: Boolean(wallet && holdings && total > 0),
+    staleTime: 30_000,
+  });
 
   return (
     <AppLayout>
@@ -221,6 +242,50 @@ export function PortfolioPage() {
                     />
                   </div>
                 </div>
+
+                {rebalancePlan && (
+                  <div className="mt-3 rounded-xl border border-border bg-surface/40 p-4 shadow-card">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Backend Rebalance Plan
+                      </div>
+                      <div className="font-mono text-[11px] text-muted-foreground">
+                        Stable {rebalancePlan.target_stable_pct.toFixed(0)}% · Max{" "}
+                        {rebalancePlan.concentration_limit_pct.toFixed(0)}%
+                      </div>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {rebalancePlan.actions.map((action) => (
+                        <div
+                          key={action.action}
+                          className="rounded-lg border border-border/60 bg-background/40 p-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-semibold">{action.action}</span>
+                            <span
+                              className={
+                                "rounded-sm px-1.5 py-0.5 text-[9px] font-bold uppercase " +
+                                (action.priority === "high"
+                                  ? "bg-bear/10 text-bear"
+                                  : action.priority === "medium"
+                                    ? "bg-chart-4/10 text-chart-4"
+                                    : "bg-bull/10 text-bull")
+                              }
+                            >
+                              {action.priority}
+                            </span>
+                          </div>
+                          <div className="mt-1 font-mono text-sm">
+                            {action.amount_usd > 0 ? fmtUsd(action.amount_usd) : "No trade"}
+                          </div>
+                          <div className="mt-1 text-[12px] text-muted-foreground">
+                            {action.rationale}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Holdings table */}
                 <div className="mt-6 overflow-hidden rounded-xl border border-border bg-surface/40 shadow-card">

@@ -98,6 +98,21 @@ export type BackendRiskRules = {
   generated_at: number;
 };
 
+export type BackendRebalanceAction = {
+  priority: "high" | "medium" | "low" | string;
+  action: string;
+  amount_usd: number;
+  rationale: string;
+};
+
+export type BackendRebalancePlan = {
+  wallet: string;
+  target_stable_pct: number;
+  concentration_limit_pct: number;
+  actions: BackendRebalanceAction[];
+  generated_at: number;
+};
+
 async function backendFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BACKEND}${path}`, {
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
@@ -137,6 +152,19 @@ export async function deleteBackendAlert(id: string): Promise<{ success: boolean
 
 export async function getBackendRiskRules(mint: string): Promise<BackendRiskRules> {
   return backendFetch<BackendRiskRules>(`/api/risk-rules/${encodeURIComponent(mint)}`);
+}
+
+export async function getBackendRebalancePlan(data: {
+  wallet: string;
+  total_value_usd: number;
+  largest_symbol?: string;
+  largest_allocation_pct: number;
+  stable_allocation_pct: number;
+}): Promise<BackendRebalancePlan> {
+  return backendFetch<BackendRebalancePlan>("/api/portfolio/rebalance", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 async function dsFetch(path: string): Promise<unknown> {

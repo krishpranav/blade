@@ -346,6 +346,87 @@ async fn handle_portfolio(Json(payload): Json<PortfolioRequest>) -> Json<Portfol
     })
 }
 
+#[derive(Deserialize)]
+struct RebalancePlanRequest {
+    wallet: String,
+    total_value_usd: f64,
+    largest_symbol: Option<String>,
+    largest_allocation_pct: f64,
+    stable_allocation_pct: f64,
+}
+
+#[derive(Serialize)]
+struct RebalanceAction {
+    priority: String,
+    action: String,
+    amount_usd: f64,
+    rationale: String,
+}
+
+#[derive(Serialize)]
+struct RebalancePlanResponse {
+    wallet: String,
+    target_stable_pct: f64,
+    concentration_limit_pct: f64,
+    actions: Vec<RebalanceAction>,
+    generated_at: u64,
+}
+
+async fn handle_rebalance_plan(
+    Json(payload): Json<RebalancePlanRequest>,
+) -> Json<RebalancePlanResponse> {
+    let mut actions = Vec::new();
+    let target_stable_pct = 12.0;
+    let concentration_limit_pct = 35.0;
+
+    if payload.stable_allocation_pct < target_stable_pct && payload.total_value_usd > 0.0 {
+        let gap_pct = target_stable_pct - payload.stable_allocation_pct;
+        actions.push(RebalanceAction {
+            priority: "high".to_string(),
+            action: "Increase stable buffer".to_string(),
+            amount_usd: payload.total_value_usd * gap_pct / 100.0,
+            rationale: format!(
+                "Stable exposure is {:.1}%, below the {:.1}% operating target.",
+                payload.stable_allocation_pct, target_stable_pct
+            ),
+        });
+    }
+
+    if payload.largest_allocation_pct > concentration_limit_pct {
+        let excess_pct = payload.largest_allocation_pct - concentration_limit_pct;
+        let symbol = payload
+            .largest_symbol
+            .unwrap_or_else(|| "largest position".to_string());
+        actions.push(RebalanceAction {
+            priority: "medium".to_string(),
+            action: format!("Trim {}", symbol),
+            amount_usd: payload.total_value_usd * excess_pct / 100.0,
+            rationale: format!(
+                "Largest allocation is {:.1}%, above the {:.1}% limit.",
+                payload.largest_allocation_pct, concentration_limit_pct
+            ),
+        });
+    }
+
+    if actions.is_empty() {
+        actions.push(RebalanceAction {
+            priority: "low".to_string(),
+            action: "Hold current allocation".to_string(),
+            amount_usd: 0.0,
+            rationale: "Portfolio is within configured concentration and stable-buffer limits."
+                .to_string(),
+        });
+    }
+
+    Json(RebalancePlanResponse {
+        wallet: payload.wallet,
+        target_stable_pct,
+        concentration_limit_pct,
+        actions,
+        generated_at: now_secs(),
+    })
+}
+
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
@@ -497,6 +578,7 @@ async fn handle_health() -> Json<HealthResponse> {
             "/api/analytics/:mint".to_string(),
             "/api/risk-rules/:mint".to_string(),
             "/api/portfolio".to_string(),
+            "/api/portfolio/rebalance".to_string(),
             "/api/leaderboard".to_string(),
             "/api/alerts".to_string(),
             "/api/alerts/delete".to_string(),
@@ -1052,6 +1134,7 @@ async fn main() {
         .route("/api/analytics/:mint", get(handle_token_analytics))
         .route("/api/risk-rules/:mint", get(handle_token_risk_rules))
         .route("/api/portfolio", post(handle_portfolio))
+        .route("/api/portfolio/rebalance", post(handle_rebalance_plan))
         .route("/api/leaderboard", get(handle_leaderboard))
         .route(
             "/api/alerts",
