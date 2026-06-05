@@ -113,6 +113,22 @@ export type BackendRebalancePlan = {
   generated_at: number;
 };
 
+export type BackendPerpsMarginQuote = {
+  market: string;
+  side: "long" | "short";
+  notional_usd: number;
+  liquidation_price: number;
+  liquidation_buffer_pct: number;
+  estimated_fee_usd: number;
+  take_profit_price: number;
+  stop_loss_price: number;
+  take_profit_pnl_usd: number;
+  stop_loss_pnl_usd: number;
+  risk_reward: number;
+  verdict: string;
+  quoted_at: number;
+};
+
 async function backendFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BACKEND}${path}`, {
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
@@ -162,6 +178,21 @@ export async function getBackendRebalancePlan(data: {
   stable_allocation_pct: number;
 }): Promise<BackendRebalancePlan> {
   return backendFetch<BackendRebalancePlan>("/api/portfolio/rebalance", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getBackendPerpsMarginQuote(data: {
+  market: string;
+  side: "long" | "short";
+  entry_price: number;
+  margin_usd: number;
+  leverage: number;
+  take_profit_pct: number;
+  stop_loss_pct: number;
+}): Promise<BackendPerpsMarginQuote> {
+  return backendFetch<BackendPerpsMarginQuote>("/api/perps/margin", {
     method: "POST",
     body: JSON.stringify(data),
   });

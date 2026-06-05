@@ -1,6 +1,8 @@
 import { AppLayout } from "@/components/AppLayout";
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { compact, fmtUsd, pctClass, fmtPct } from "@/lib/format";
+import { getBackendPerpsMarginQuote } from "@/server/solana";
 
 type Market = { sym: string; price: number; change: number };
 const MARKETS: Market[] = [
@@ -70,6 +72,24 @@ export function PerpsPage() {
       health,
     };
   }, [lev, market.price, side, size, stopLossPct, takeProfitPct]);
+
+  const marginQuote = useQuery({
+    queryKey: ["perps-margin", market.sym, side, size, lev, takeProfitPct, stopLossPct],
+    queryFn: () =>
+      getBackendPerpsMarginQuote({
+        market: market.sym,
+        side,
+        entry_price: market.price,
+        margin_usd: Math.max(0, parseFloat(size || "0") || 0),
+        leverage: lev,
+        take_profit_pct: takeProfitPct,
+        stop_loss_pct: stopLossPct,
+      }),
+    enabled: Boolean(size && Number(size) > 0),
+    staleTime: 5_000,
+  });
+
+  const quote = marginQuote.data;
 
   return (
     <AppLayout>
@@ -245,33 +265,59 @@ export function PerpsPage() {
               </div>
               <div className="space-y-1.5 rounded-lg border border-border bg-surface-2/60 p-3 text-[11px]">
                 <Row label="Entry" value={fmtUsd(risk.entry)} />
-                <Row label="Notional" value={"$" + compact(risk.notional)} />
-                <Row label="Est. fee" value={fmtUsd(risk.fee)} />
-                <Row label="Liq. price" value={fmtUsd(risk.liquidation)} />
-                <Row label="Liq. buffer" value={risk.liqMovePct.toFixed(2) + "%"} />
+                <Row label="Notional" value={"$" + compact(quote?.notional_usd ?? risk.notional)} />
+                <Row label="Est. fee" value={fmtUsd(quote?.estimated_fee_usd ?? risk.fee)} />
+                <Row
+                  label="Liq. price"
+                  value={fmtUsd(quote?.liquidation_price ?? risk.liquidation)}
+                />
+                <Row
+                  label="Liq. buffer"
+                  value={(quote?.liquidation_buffer_pct ?? risk.liqMovePct).toFixed(2) + "%"}
+                />
               </div>
               <div className="rounded-lg border border-border bg-background/50 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
                     Risk preview
                   </span>
-                  <span className={riskTone(risk.health)}>{risk.health}</span>
+                  <span className={riskTone(quote?.verdict ?? risk.health)}>
+                    {quote?.verdict ?? risk.health}
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <PreviewStat label="TP price" value={fmtUsd(risk.tpPrice)} tone="bull" />
-                  <PreviewStat label="SL price" value={fmtUsd(risk.slPrice)} tone="bear" />
-                  <PreviewStat label="TP PnL" value={fmtUsd(risk.tpPnl)} tone="bull" />
-                  <PreviewStat label="SL PnL" value={fmtUsd(risk.slPnl)} tone="bear" />
+                  <PreviewStat
+                    label="TP price"
+                    value={fmtUsd(quote?.take_profit_price ?? risk.tpPrice)}
+                    tone="bull"
+                  />
+                  <PreviewStat
+                    label="SL price"
+                    value={fmtUsd(quote?.stop_loss_price ?? risk.slPrice)}
+                    tone="bear"
+                  />
+                  <PreviewStat
+                    label="TP PnL"
+                    value={fmtUsd(quote?.take_profit_pnl_usd ?? risk.tpPnl)}
+                    tone="bull"
+                  />
+                  <PreviewStat
+                    label="SL PnL"
+                    value={fmtUsd(quote?.stop_loss_pnl_usd ?? risk.slPnl)}
+                    tone="bear"
+                  />
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
                   <div
                     className="h-full bg-violet-gradient"
-                    style={{ width: Math.min(100, risk.riskReward * 35) + "%" }}
+                    style={{
+                      width: Math.min(100, (quote?.risk_reward ?? risk.riskReward) * 35) + "%",
+                    }}
                   />
                 </div>
                 <div className="mt-1 flex justify-between font-mono text-[10px] text-muted-foreground">
                   <span>R:R</span>
-                  <span>{risk.riskReward.toFixed(2)}x</span>
+                  <span>{(quote?.risk_reward ?? risk.riskReward).toFixed(2)}x</span>
                 </div>
               </div>
               <button

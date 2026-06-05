@@ -427,6 +427,98 @@ async fn handle_rebalance_plan(
     })
 }
 
+// ─── Perps Margin Quote ──────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct PerpsMarginRequest {
+    market: String,
+    side: String,
+    entry_price: f64,
+    margin_usd: f64,
+    leverage: f64,
+    take_profit_pct: f64,
+    stop_loss_pct: f64,
+}
+
+#[derive(Serialize)]
+struct PerpsMarginResponse {
+    market: String,
+    side: String,
+    notional_usd: f64,
+    liquidation_price: f64,
+    liquidation_buffer_pct: f64,
+    estimated_fee_usd: f64,
+    take_profit_price: f64,
+    stop_loss_price: f64,
+    take_profit_pnl_usd: f64,
+    stop_loss_pnl_usd: f64,
+    risk_reward: f64,
+    verdict: String,
+    quoted_at: u64,
+}
+
+async fn handle_perps_margin(Json(payload): Json<PerpsMarginRequest>) -> Json<PerpsMarginResponse> {
+    let leverage = payload.leverage.max(1.0);
+    let margin = payload.margin_usd.max(0.0);
+    let notional = margin * leverage;
+    let is_long = payload.side == "long";
+    let liquidation_price = payload.entry_price
+        * if is_long {
+            1.0 - 1.0 / leverage
+        } else {
+            1.0 + 1.0 / leverage
+        };
+    let liquidation_buffer_pct =
+        ((liquidation_price - payload.entry_price) / payload.entry_price).abs() * 100.0;
+    let estimated_fee_usd = notional * 0.0006;
+    let take_profit_price = payload.entry_price
+        * if is_long {
+            1.0 + payload.take_profit_pct / 100.0
+        } else {
+            1.0 - payload.take_profit_pct / 100.0
+        };
+    let stop_loss_price = payload.entry_price
+        * if is_long {
+            1.0 - payload.stop_loss_pct / 100.0
+        } else {
+            1.0 + payload.stop_loss_pct / 100.0
+        };
+    let take_profit_pnl_usd =
+        margin * (payload.take_profit_pct / 100.0) * leverage - estimated_fee_usd;
+    let stop_loss_pnl_usd =
+        -(margin * (payload.stop_loss_pct / 100.0) * leverage + estimated_fee_usd);
+    let risk_reward = if payload.stop_loss_pct > 0.0 {
+        payload.take_profit_pct / payload.stop_loss_pct
+    } else {
+        0.0
+    };
+    let verdict = if liquidation_buffer_pct <= payload.stop_loss_pct {
+        "Liquidation before stop"
+    } else if risk_reward >= 2.0 {
+        "Favorable"
+    } else if risk_reward >= 1.0 {
+        "Balanced"
+    } else {
+        "Poor payoff"
+    };
+
+    Json(PerpsMarginResponse {
+        market: payload.market,
+        side: payload.side,
+        notional_usd: notional,
+        liquidation_price,
+        liquidation_buffer_pct,
+        estimated_fee_usd,
+        take_profit_price,
+        stop_loss_price,
+        take_profit_pnl_usd,
+        stop_loss_pnl_usd,
+        risk_reward,
+        verdict: verdict.to_string(),
+        quoted_at: now_ms(),
+    })
+}
+
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
@@ -579,6 +671,7 @@ async fn handle_health() -> Json<HealthResponse> {
             "/api/risk-rules/:mint".to_string(),
             "/api/portfolio".to_string(),
             "/api/portfolio/rebalance".to_string(),
+            "/api/perps/margin".to_string(),
             "/api/leaderboard".to_string(),
             "/api/alerts".to_string(),
             "/api/alerts/delete".to_string(),
@@ -1135,6 +1228,7 @@ async fn main() {
         .route("/api/risk-rules/:mint", get(handle_token_risk_rules))
         .route("/api/portfolio", post(handle_portfolio))
         .route("/api/portfolio/rebalance", post(handle_rebalance_plan))
+        .route("/api/perps/margin", post(handle_perps_margin))
         .route("/api/leaderboard", get(handle_leaderboard))
         .route(
             "/api/alerts",
