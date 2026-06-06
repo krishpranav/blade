@@ -98,6 +98,87 @@ async fn handle_swap(Json(payload): Json<SwapRequest>) -> Json<SwapResponse> {
     })
 }
 
+#[derive(Deserialize)]
+struct ExecutionTraceRequest {
+    input_mint: String,
+    output_mint: String,
+    amount: f64,
+    slippage: f64,
+    anti_mev: Option<bool>,
+}
+
+#[derive(Serialize)]
+struct ExecutionTraceStep {
+    label: String,
+    status: String,
+    detail: String,
+    latency_ms: u64,
+}
+
+#[derive(Serialize)]
+struct ExecutionTraceResponse {
+    trace_id: String,
+    route: Vec<String>,
+    expected_output: f64,
+    minimum_received: f64,
+    protection_level: String,
+    steps: Vec<ExecutionTraceStep>,
+    generated_at: u64,
+}
+
+async fn handle_execution_trace(
+    Json(payload): Json<ExecutionTraceRequest>,
+) -> Json<ExecutionTraceResponse> {
+    let simulated_price = 0.005;
+    let expected_output = payload.amount * simulated_price;
+    let minimum_received = expected_output * (1.0 - payload.slippage / 100.0 - 0.001);
+    let protection_level = if payload.anti_mev.unwrap_or(true) {
+        "Jito protected"
+    } else {
+        "Standard routing"
+    };
+
+    Json(ExecutionTraceResponse {
+        trace_id: format!("trace_{}", now_ms()),
+        route: vec![
+            payload.input_mint.clone(),
+            "Raydium".to_string(),
+            "Blade Router".to_string(),
+            payload.output_mint.clone(),
+        ],
+        expected_output,
+        minimum_received,
+        protection_level: protection_level.to_string(),
+        steps: vec![
+            ExecutionTraceStep {
+                label: "Quote normalization".to_string(),
+                status: "ok".to_string(),
+                detail: "Input amount and slippage bounds accepted.".to_string(),
+                latency_ms: 12 + fastrand::u64(0..10),
+            },
+            ExecutionTraceStep {
+                label: "Route simulation".to_string(),
+                status: "ok".to_string(),
+                detail: "Best simulated route selected across available pools.".to_string(),
+                latency_ms: 24 + fastrand::u64(0..16),
+            },
+            ExecutionTraceStep {
+                label: "MEV policy".to_string(),
+                status: "ok".to_string(),
+                detail: protection_level.to_string(),
+                latency_ms: 8 + fastrand::u64(0..8),
+            },
+            ExecutionTraceStep {
+                label: "Transaction envelope".to_string(),
+                status: "ready".to_string(),
+                detail: "Swap instruction set is ready for wallet signing.".to_string(),
+                latency_ms: 18 + fastrand::u64(0..12),
+            },
+        ],
+        generated_at: now_ms(),
+    })
+}
+
 // ─── Price History ────────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
@@ -666,6 +747,7 @@ async fn handle_health() -> Json<HealthResponse> {
             "/api/market/snapshot".to_string(),
             "/api/quote".to_string(),
             "/api/swap".to_string(),
+            "/api/execution/trace".to_string(),
             "/api/price-history/:mint".to_string(),
             "/api/analytics/:mint".to_string(),
             "/api/risk-rules/:mint".to_string(),
@@ -1223,6 +1305,7 @@ async fn main() {
         .route("/api/market/snapshot", get(handle_market_snapshot))
         .route("/api/quote", post(handle_quote))
         .route("/api/swap", post(handle_swap))
+        .route("/api/execution/trace", post(handle_execution_trace))
         .route("/api/price-history/:mint", get(handle_price_history))
         .route("/api/analytics/:mint", get(handle_token_analytics))
         .route("/api/risk-rules/:mint", get(handle_token_risk_rules))

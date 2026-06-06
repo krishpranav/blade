@@ -129,6 +129,21 @@ export type BackendPerpsMarginQuote = {
   quoted_at: number;
 };
 
+export type BackendExecutionTrace = {
+  trace_id: string;
+  route: string[];
+  expected_output: number;
+  minimum_received: number;
+  protection_level: string;
+  steps: {
+    label: string;
+    status: string;
+    detail: string;
+    latency_ms: number;
+  }[];
+  generated_at: number;
+};
+
 async function backendFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BACKEND}${path}`, {
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
@@ -193,6 +208,19 @@ export async function getBackendPerpsMarginQuote(data: {
   stop_loss_pct: number;
 }): Promise<BackendPerpsMarginQuote> {
   return backendFetch<BackendPerpsMarginQuote>("/api/perps/margin", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getBackendExecutionTrace(data: {
+  input_mint: string;
+  output_mint: string;
+  amount: number;
+  slippage: number;
+  anti_mev?: boolean;
+}): Promise<BackendExecutionTrace> {
+  return backendFetch<BackendExecutionTrace>("/api/execution/trace", {
     method: "POST",
     body: JSON.stringify(data),
   });

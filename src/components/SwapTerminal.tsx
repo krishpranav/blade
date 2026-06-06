@@ -1,7 +1,16 @@
 import React, { useState } from "react";
-import { ArrowDownUp, Settings, Zap, CheckCircle2, Loader2, ShieldCheck, Flame } from "lucide-react";
+import {
+  ArrowDownUp,
+  Settings,
+  Zap,
+  CheckCircle2,
+  Loader2,
+  ShieldCheck,
+  Flame,
+} from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { fmtUsd } from "@/lib/format";
+import { getBackendExecutionTrace } from "@/server/solana";
 
 export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
   const [inputMint, setInputMint] = useState(defaultInput);
@@ -39,6 +48,20 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
     refetchInterval: 5000, // Refetch every 5s for real-time feel
   });
 
+  const { data: trace } = useQuery({
+    queryKey: ["execution-trace", inputMint, outputMint, amount, slippage, antiMev],
+    queryFn: () =>
+      getBackendExecutionTrace({
+        input_mint: inputMint,
+        output_mint: outputMint,
+        amount: Number(amount),
+        slippage,
+        anti_mev: antiMev,
+      }),
+    enabled: Boolean(amount && !isNaN(Number(amount)) && Number(amount) > 0),
+    staleTime: 5_000,
+  });
+
   const swapMutation = useMutation({
     mutationFn: async () => {
       const isLimit = activeTab === "limit";
@@ -64,7 +87,9 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
           body: JSON.stringify({
             token_symbol: inputMint === "SOL" ? outputMint : inputMint,
             type: inputMint === "SOL" ? "DCA Buy" : "DCA Sell",
-            trigger_price: quote?.expected_output ? (Number(amount) * 178.42 / quote.expected_output) : 1.0,
+            trigger_price: quote?.expected_output
+              ? (Number(amount) * 178.42) / quote.expected_output
+              : 1.0,
             size_usd: Number(amount) * (inputMint === "SOL" ? 178.42 : 1.0),
           }),
         });
@@ -101,7 +126,7 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
           <Zap className="h-5 w-5 text-violet" />
           Terminal
         </h3>
-        <button 
+        <button
           onClick={() => setShowSettings(!showSettings)}
           className={`rounded-md p-2 transition-colors ${showSettings ? "bg-violet/20 text-violet" : "text-muted-foreground hover:bg-surface hover:text-foreground"}`}
         >
@@ -204,7 +229,9 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
         <div className="mt-3 rounded-sm border border-neutral-800 bg-black p-4 space-y-3">
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="text-[9px] uppercase tracking-widest text-neutral-600">Interval</label>
+              <label className="text-[9px] uppercase tracking-widest text-neutral-600">
+                Interval
+              </label>
               <select
                 value={dcaInterval}
                 onChange={(e) => setDcaInterval(e.target.value)}
@@ -216,7 +243,9 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
               </select>
             </div>
             <div className="flex-1">
-              <label className="text-[9px] uppercase tracking-widest text-neutral-600">Orders</label>
+              <label className="text-[9px] uppercase tracking-widest text-neutral-600">
+                Orders
+              </label>
               <select
                 value={dcaFrequency}
                 onChange={(e) => setDcaFrequency(e.target.value)}
@@ -236,7 +265,9 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
         <div className="mt-4 rounded-sm border border-neutral-800 bg-black p-3 text-[10px] uppercase tracking-wider text-neutral-500">
           <div className="flex justify-between py-1">
             <span>Minimum Received</span>
-            <span className="font-mono text-white">{quote.minimum_received.toFixed(4)} {outputMint}</span>
+            <span className="font-mono text-white">
+              {quote.minimum_received.toFixed(4)} {outputMint}
+            </span>
           </div>
           <div className="flex justify-between py-1">
             <span>Price Impact</span>
@@ -248,7 +279,36 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
           </div>
           <div className="flex justify-between py-1">
             <span>Route</span>
-            <span className="font-mono text-violet">Axiom Router</span>
+            <span className="font-mono text-violet">
+              {trace?.route?.slice(1, -1).join(" → ") || "Axiom Router"}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {trace && (
+        <div className="mt-3 rounded-sm border border-neutral-800 bg-black p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+              Execution Trace
+            </div>
+            <div className="font-mono text-[10px] text-bull">{trace.protection_level}</div>
+          </div>
+          <div className="space-y-1.5">
+            {trace.steps.map((step) => (
+              <div
+                key={step.label}
+                className="rounded-sm border border-neutral-900 bg-[#0a0a0a] p-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold text-white">{step.label}</span>
+                  <span className="font-mono text-[9px] uppercase text-violet">
+                    {step.status} · {step.latency_ms}ms
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[10px] text-neutral-600">{step.detail}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -273,10 +333,12 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
               ))}
             </div>
           </div>
-          
+
           <div className="space-y-2 pt-2 border-t border-border/20">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><Flame className="h-3 w-3 text-amber-500" /> Jito MEV Tip</span>
+              <span className="flex items-center gap-1">
+                <Flame className="h-3 w-3 text-amber-500" /> Jito MEV Tip
+              </span>
               <span className="font-mono text-amber-500">{jitoTip} SOL</span>
             </div>
             <div className="flex gap-2">
@@ -297,11 +359,13 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
               <ShieldCheck className={`h-4 w-4 ${antiMev ? "text-bull" : ""}`} />
               Anti-MEV Protection
             </div>
-            <button 
+            <button
               onClick={() => setAntiMev(!antiMev)}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${antiMev ? "bg-bull" : "bg-surface-2"}`}
             >
-              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${antiMev ? "translate-x-5" : "translate-x-1"}`} />
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${antiMev ? "translate-x-5" : "translate-x-1"}`}
+              />
             </button>
           </div>
         </div>
@@ -321,8 +385,10 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
           <>
             <CheckCircle2 className="h-5 w-5" /> Confirmed
           </>
+        ) : activeTab === "snipe" ? (
+          "Execute Swap"
         ) : (
-          activeTab === "snipe" ? "Execute Swap" : `Place ${activeTab.toUpperCase()} Order`
+          `Place ${activeTab.toUpperCase()} Order`
         )}
       </button>
 
