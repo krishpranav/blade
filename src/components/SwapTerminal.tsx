@@ -14,6 +14,8 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"snipe" | "limit" | "dca">("snipe");
   const [limitPrice, setLimitPrice] = useState<string>("");
+  const [dcaInterval, setDcaInterval] = useState<string>("hourly");
+  const [dcaFrequency, setDcaFrequency] = useState<string>("5");
 
   // Fetch mock quote from Rust backend
   const { data: quote, isLoading: isQuoting } = useQuery({
@@ -39,20 +41,51 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
 
   const swapMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("http://127.0.0.1:3000/api/swap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input_mint: inputMint,
-          output_mint: outputMint,
-          amount: Number(amount),
-          slippage,
-          jito_tip_sol: jitoTip,
-          anti_mev: antiMev,
-        }),
-      });
-      if (!res.ok) throw new Error("Swap failed");
-      return res.json();
+      const isLimit = activeTab === "limit";
+      const isDca = activeTab === "dca";
+
+      if (isLimit) {
+        const res = await fetch("http://127.0.0.1:3000/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token_symbol: inputMint === "SOL" ? outputMint : inputMint,
+            type: inputMint === "SOL" ? "Limit Buy" : "Limit Sell",
+            trigger_price: Number(limitPrice),
+            size_usd: Number(amount) * (inputMint === "SOL" ? 178.42 : 1.0),
+          }),
+        });
+        if (!res.ok) throw new Error("Order placement failed");
+        return res.json();
+      } else if (isDca) {
+        const res = await fetch("http://127.0.0.1:3000/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token_symbol: inputMint === "SOL" ? outputMint : inputMint,
+            type: inputMint === "SOL" ? "DCA Buy" : "DCA Sell",
+            trigger_price: quote?.expected_output ? (Number(amount) * 178.42 / quote.expected_output) : 1.0,
+            size_usd: Number(amount) * (inputMint === "SOL" ? 178.42 : 1.0),
+          }),
+        });
+        if (!res.ok) throw new Error("DCA placement failed");
+        return res.json();
+      } else {
+        const res = await fetch("http://127.0.0.1:3000/api/swap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            input_mint: inputMint,
+            output_mint: outputMint,
+            amount: Number(amount),
+            slippage,
+            jito_tip_sol: jitoTip,
+            anti_mev: antiMev,
+          }),
+        });
+        if (!res.ok) throw new Error("Swap failed");
+        return res.json();
+      }
     },
   });
 
@@ -168,9 +201,32 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
       )}
 
       {activeTab === "dca" && (
-        <div className="mt-3 rounded-sm border border-neutral-800 bg-black p-4">
-          <div className="text-[10px] uppercase text-center text-neutral-500">
-            DCA settings (Interval, Duration)
+        <div className="mt-3 rounded-sm border border-neutral-800 bg-black p-4 space-y-3">
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[9px] uppercase tracking-widest text-neutral-600">Interval</label>
+              <select
+                value={dcaInterval}
+                onChange={(e) => setDcaInterval(e.target.value)}
+                className="mt-1 w-full rounded-sm border border-neutral-800 bg-[#0a0a0a] px-2 py-1.5 text-[11px] text-white outline-none focus:border-violet/50"
+              >
+                <option value="hourly">Hourly</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="text-[9px] uppercase tracking-widest text-neutral-600">Orders</label>
+              <select
+                value={dcaFrequency}
+                onChange={(e) => setDcaFrequency(e.target.value)}
+                className="mt-1 w-full rounded-sm border border-neutral-800 bg-[#0a0a0a] px-2 py-1.5 text-[11px] text-white outline-none focus:border-violet/50"
+              >
+                <option value="2">2 Orders</option>
+                <option value="5">5 Orders</option>
+                <option value="10">10 Orders</option>
+              </select>
+            </div>
           </div>
         </div>
       )}
