@@ -1,12 +1,12 @@
 use axum::{
-    extract::{Json, Path, Query},
+    extract::{Json, Path, Query, State},
     response::IntoResponse,
     routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
-use std::{collections::HashMap, net::SocketAddr, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::HashMap, net::SocketAddr, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 
 // ─── Shared Types ────────────────────────────────────────────────────────────
 
@@ -102,7 +102,7 @@ struct OhlcCandle {
 }
 
 async fn handle_price_history(
-    Path(mint): Path<String>,
+    Path(_mint): Path<String>,
     Query(params): Query<PriceHistoryQuery>,
 ) -> Json<Vec<OhlcCandle>> {
     let interval_ms: u64 = match params.interval.as_deref().unwrap_or("5m") {
@@ -158,7 +158,6 @@ struct TokenAnalytics {
 }
 
 async fn handle_token_analytics(Path(mint): Path<String>) -> Json<TokenAnalytics> {
-    // Deterministic mock based on mint length (would be real on-chain call in prod)
     let seed = mint.len() as u8;
     let risk_score = 50u8.saturating_add(seed % 45);
     Json(TokenAnalytics {
@@ -277,7 +276,7 @@ async fn handle_health() -> Json<HealthResponse> {
     let start = START_TIME.get_or_init(now_secs);
     Json(HealthResponse {
         status: "ok".to_string(),
-        version: "0.4.0".to_string(),
+        version: "0.5.0".to_string(),
         uptime_secs: now_secs() - start,
         endpoints: vec![
             "/api/health".to_string(),
@@ -287,8 +286,396 @@ async fn handle_health() -> Json<HealthResponse> {
             "/api/analytics/:mint".to_string(),
             "/api/portfolio".to_string(),
             "/api/leaderboard".to_string(),
+            "/api/orders".to_string(),
+            "/api/orders/cancel".to_string(),
+            "/api/positions".to_string(),
+            "/api/positions/close".to_string(),
+            "/api/arbitrage".to_string(),
+            "/api/bot/logs".to_string(),
         ],
     })
+}
+
+// ─── Shared State Definitions ───────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct Order {
+    id: String,
+    token_symbol: String,
+    #[serde(rename = "type")]
+    order_type: String, // "Limit Buy", "Limit Sell", "Take Profit", "Stop Loss", "DCA Buy"
+    trigger_price: f64,
+    size_usd: f64,
+    status: String, // "Open", "Filled", "Cancelled"
+    created_at: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct Position {
+    id: String,
+    token_symbol: String,
+    size_usd: f64,
+    entry_price: f64,
+    current_price: f64,
+    pnl_usd: f64,
+    pnl_pct: f64,
+    created_at: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct ArbitrageOpp {
+    id: String,
+    token_symbol: String,
+    buy_dex: String,
+    sell_dex: String,
+    buy_price: f64,
+    sell_price: f64,
+    profit_pct: f64,
+    expected_profit_usd: f64,
+    timestamp: u64,
+}
+
+struct AppState {
+    orders: Mutex<Vec<Order>>,
+    positions: Mutex<Vec<Position>>,
+    bot_logs: Mutex<Vec<String>>,
+    arbitrage_opportunities: Mutex<Vec<ArbitrageOpp>>,
+    current_prices: Mutex<HashMap<String, f64>>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        let mut prices = HashMap::new();
+        prices.insert("SOL".to_string(), 178.42);
+        prices.insert("BTC".to_string(), 71240.0);
+        prices.insert("ETH".to_string(), 3640.0);
+        prices.insert("WIF".to_string(), 2.84);
+        prices.insert("BONK".to_string(), 0.0000234);
+        prices.insert("POPCAT".to_string(), 0.42);
+
+        let orders = vec![
+            Order {
+                id: "o1".to_string(),
+                token_symbol: "WIF".to_string(),
+                order_type: "Take Profit".to_string(),
+                trigger_price: 3.00,
+                size_usd: 1250.00,
+                status: "Open".to_string(),
+                created_at: now_secs(),
+            },
+            Order {
+                id: "o2".to_string(),
+                token_symbol: "BONK".to_string(),
+                order_type: "Limit Buy".to_string(),
+                trigger_price: 0.000015,
+                size_usd: 500.00,
+                status: "Open".to_string(),
+                created_at: now_secs(),
+            },
+        ];
+
+        let positions = vec![
+            Position {
+                id: "p1".to_string(),
+                token_symbol: "WIF".to_string(),
+                size_usd: 1250.00,
+                entry_price: 2.10,
+                current_price: 2.45,
+                pnl_usd: 208.33,
+                pnl_pct: 16.66,
+                created_at: now_secs(),
+            },
+            Position {
+                id: "p2".to_string(),
+                token_symbol: "POPCAT".to_string(),
+                size_usd: 840.00,
+                entry_price: 0.45,
+                current_price: 0.41,
+                pnl_usd: -74.66,
+                pnl_pct: -8.88,
+                created_at: now_secs(),
+            },
+        ];
+
+        Self {
+            orders: Mutex::new(orders),
+            positions: Mutex::new(positions),
+            bot_logs: Mutex::new(vec![
+                format!("[{}] 🤖 System matching engine initialized.", now_secs()),
+                format!("[{}] 🔎 Sniper Bot scanning mempool...", now_secs()),
+            ]),
+            arbitrage_opportunities: Mutex::new(vec![]),
+            current_prices: Mutex::new(prices),
+        }
+    }
+}
+
+// ─── API Handlers ───────────────────────────────────────────────────────────
+
+async fn handle_get_orders(State(state): State<Arc<AppState>>) -> Json<Vec<Order>> {
+    let orders = state.orders.lock().unwrap();
+    Json(orders.clone())
+}
+
+#[derive(Deserialize)]
+struct CreateOrderRequest {
+    token_symbol: String,
+    #[serde(rename = "type")]
+    order_type: String,
+    trigger_price: f64,
+    size_usd: f64,
+}
+
+async fn handle_create_order(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateOrderRequest>,
+) -> Json<Order> {
+    let mut orders = state.orders.lock().unwrap();
+    let order = Order {
+        id: format!("o_{}", now_ms()),
+        token_symbol: payload.token_symbol.clone(),
+        order_type: payload.order_type.clone(),
+        trigger_price: payload.trigger_price,
+        size_usd: payload.size_usd,
+        status: "Open".to_string(),
+        created_at: now_secs(),
+    };
+    orders.push(order.clone());
+
+    let mut logs = state.bot_logs.lock().unwrap();
+    logs.insert(0, format!(
+        "[{}] 📥 Order placed: {} {} at trigger ${:.6}",
+        now_secs(),
+        payload.order_type,
+        payload.token_symbol,
+        payload.trigger_price
+    ));
+
+    Json(order)
+}
+
+#[derive(Deserialize)]
+struct CancelOrderRequest {
+    id: String,
+}
+
+async fn handle_cancel_order(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CancelOrderRequest>,
+) -> Json<HashMap<String, bool>> {
+    let mut orders = state.orders.lock().unwrap();
+    let mut success = false;
+    
+    if let Some(order) = orders.iter_mut().find(|o| o.id == payload.id) {
+        order.status = "Cancelled".to_string();
+        success = true;
+
+        let mut logs = state.bot_logs.lock().unwrap();
+        logs.insert(0, format!(
+            "[{}] ✕ Order cancelled: {} for {}",
+            now_secs(),
+            order.order_type,
+            order.token_symbol
+        ));
+    }
+    
+    orders.retain(|o| o.id != payload.id);
+
+    let mut res = HashMap::new();
+    res.insert("success".to_string(), success);
+    Json(res)
+}
+
+async fn handle_get_positions(State(state): State<Arc<AppState>>) -> Json<Vec<Position>> {
+    let positions = state.positions.lock().unwrap();
+    Json(positions.clone())
+}
+
+#[derive(Deserialize)]
+struct ClosePositionRequest {
+    id: String,
+}
+
+async fn handle_close_position(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<ClosePositionRequest>,
+) -> Json<HashMap<String, bool>> {
+    let mut positions = state.positions.lock().unwrap();
+    let mut success = false;
+
+    if let Some(pos) = positions.iter().find(|p| p.id == payload.id) {
+        success = true;
+        let pnl_str = if pos.pnl_usd >= 0.0 {
+            format!("+${:.2}", pos.pnl_usd)
+        } else {
+            format!("-${:.2}", pos.pnl_usd.abs())
+        };
+
+        let mut logs = state.bot_logs.lock().unwrap();
+        logs.insert(0, format!(
+            "[{}] 🚪 Closed position: {} (PnL: {})",
+            now_secs(),
+            pos.token_symbol,
+            pnl_str
+        ));
+    }
+
+    positions.retain(|p| p.id != payload.id);
+
+    let mut res = HashMap::new();
+    res.insert("success".to_string(), success);
+    Json(res)
+}
+
+async fn handle_get_arbitrage(State(state): State<Arc<AppState>>) -> Json<Vec<ArbitrageOpp>> {
+    let opps = state.arbitrage_opportunities.lock().unwrap();
+    Json(opps.clone())
+}
+
+async fn handle_get_bot_logs(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {
+    let logs = state.bot_logs.lock().unwrap();
+    Json(logs.clone())
+}
+
+// ─── Simulation Task ────────────────────────────────────────────────────────
+
+async fn start_background_simulation(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(2000));
+    loop {
+        interval.tick().await;
+
+        // 1. Update Prices
+        let mut prices = state.current_prices.lock().unwrap();
+        for (sym, price) in prices.iter_mut() {
+            let volatility = if sym == "SOL" { 0.005 } else if sym == "BTC" { 0.002 } else { 0.03 };
+            let change = (fastrand::f64() - 0.49) * volatility * *price;
+            *price = (*price + change).max(0.000001);
+        }
+
+        let current_prices = prices.clone();
+        drop(prices);
+
+        // 2. Update Positions Current Price and PnL
+        {
+            let mut positions = state.positions.lock().unwrap();
+            for pos in positions.iter_mut() {
+                if let Some(curr_price) = current_prices.get(&pos.token_symbol) {
+                    pos.current_price = *curr_price;
+                    let pnl_pct = (pos.current_price / pos.entry_price - 1.0) * 100.0;
+                    pos.pnl_pct = pnl_pct;
+                    pos.pnl_usd = pos.size_usd * (pnl_pct / 100.0);
+                }
+            }
+        }
+
+        // 3. Match and Fill Limit Orders
+        {
+            let mut orders = state.orders.lock().unwrap();
+            let mut positions = state.positions.lock().unwrap();
+            let mut logs = state.bot_logs.lock().unwrap();
+            let mut filled_indices = Vec::new();
+
+            for (idx, order) in orders.iter_mut().enumerate() {
+                if order.status != "Open" { continue; }
+
+                if let Some(price) = current_prices.get(&order.token_symbol) {
+                    let mut should_fill = false;
+
+                    if order.order_type == "Limit Buy" && *price <= order.trigger_price {
+                        should_fill = true;
+                    } else if order.order_type == "Limit Sell" && *price >= order.trigger_price {
+                        should_fill = true;
+                    } else if order.order_type == "Take Profit" && *price >= order.trigger_price {
+                        should_fill = true;
+                    } else if order.order_type == "Stop Loss" && *price <= order.trigger_price {
+                        should_fill = true;
+                    }
+
+                    if should_fill {
+                        order.status = "Filled".to_string();
+                        filled_indices.push(idx);
+
+                        positions.push(Position {
+                            id: format!("p_{}", now_ms()),
+                            token_symbol: order.token_symbol.clone(),
+                            size_usd: order.size_usd,
+                            entry_price: *price,
+                            current_price: *price,
+                            pnl_usd: 0.0,
+                            pnl_pct: 0.0,
+                            created_at: now_secs(),
+                        });
+
+                        logs.insert(0, format!(
+                            "[{}] 🚀 Filled order: {} {} at ${:.6}",
+                            now_secs(),
+                            order.order_type,
+                            order.token_symbol,
+                            price
+                        ));
+                    }
+                }
+            }
+
+            for idx in filled_indices.into_iter().rev() {
+                orders.remove(idx);
+            }
+        }
+
+        // 4. Generate Arbitrage Opportunities
+        {
+            let mut opps = state.arbitrage_opportunities.lock().unwrap();
+            opps.clear();
+
+            let dexes = vec!["Raydium", "Orca", "Meteora"];
+            let symbols = vec!["WIF", "BONK", "POPCAT", "SOL"];
+
+            for sym in symbols {
+                if let Some(base_price) = current_prices.get(sym) {
+                    let diff = base_price * (0.005 + fastrand::f64() * 0.02);
+                    let is_buy_raydium = fastrand::bool();
+                    let (buy_dex, sell_dex, buy_price, sell_price) = if is_buy_raydium {
+                        (dexes[0], dexes[1], *base_price - diff/2.0, *base_price + diff/2.0)
+                    } else {
+                        (dexes[1], dexes[2], *base_price - diff/2.0, *base_price + diff/2.0)
+                    };
+
+                    let profit_pct = (sell_price / buy_price - 1.0) * 100.0;
+                    let size_usd = 2000.0 + fastrand::f64() * 8000.0;
+
+                    opps.push(ArbitrageOpp {
+                        id: format!("arb_{}", now_ms()),
+                        token_symbol: sym.to_string(),
+                        buy_dex: buy_dex.to_string(),
+                        sell_dex: sell_dex.to_string(),
+                        buy_price,
+                        sell_price,
+                        profit_pct,
+                        expected_profit_usd: size_usd * (profit_pct / 100.0),
+                        timestamp: now_secs(),
+                    });
+                }
+            }
+        }
+
+        // 5. Add random scanner bot logs
+        {
+            let mut logs = state.bot_logs.lock().unwrap();
+            let random = fastrand::u8(0..10);
+            if random == 0 {
+                logs.insert(0, format!("[{}] ⚡ New token pair detected on Raydium. Scanning safety...", now_secs()));
+            } else if random == 1 {
+                logs.insert(0, format!("[{}] 🛡 Liquidity lock audit: PASS", now_secs()));
+            } else if random == 2 {
+                logs.insert(0, format!("[{}] 🔎 Scanning Solana mempool for large orders...", now_secs()));
+            } else if random == 3 {
+                logs.insert(0, format!("[{}] 💎 Whale wallet copy-trade triggered.", now_secs()));
+            }
+            if logs.len() > 50 {
+                logs.truncate(50);
+            }
+        }
+    }
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -300,25 +687,40 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let state = Arc::new(AppState::default());
+
+    let state_clone = Arc::clone(&state);
+    tokio::spawn(async move {
+        start_background_simulation(state_clone).await;
+    });
+
     let app = Router::new()
-        // Core
         .route("/api/health", get(handle_health))
-        // Trading
         .route("/api/quote", post(handle_quote))
         .route("/api/swap", post(handle_swap))
-        // Analytics
         .route("/api/price-history/:mint", get(handle_price_history))
         .route("/api/analytics/:mint", get(handle_token_analytics))
-        // Portfolio & Social
         .route("/api/portfolio", post(handle_portfolio))
         .route("/api/leaderboard", get(handle_leaderboard))
+        // Orders API
+        .route("/api/orders", get(handle_get_orders).post(handle_create_order))
+        .route("/api/orders/cancel", post(handle_cancel_order))
+        // Positions API
+        .route("/api/positions", get(handle_get_positions))
+        .route("/api/positions/close", post(handle_close_position))
+        // Arbitrage and Live Logs
+        .route("/api/arbitrage", get(handle_get_arbitrage))
+        .route("/api/bot/logs", get(handle_get_bot_logs))
+        .with_state(state)
         .layer(cors);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("🔪 Blade Backend v0.4.0 listening on {}", addr);
+    println!("🔪 Blade Backend v0.5.0 listening on {}", addr);
     println!("   Endpoints: /api/health | /api/quote | /api/swap");
     println!("             /api/price-history/:mint | /api/analytics/:mint");
     println!("             /api/portfolio | /api/leaderboard");
+    println!("             /api/orders | /api/orders/cancel | /api/positions | /api/positions/close");
+    println!("             /api/arbitrage | /api/bot/logs");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
