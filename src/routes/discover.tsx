@@ -1,17 +1,42 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, useCallback, memo } from "react";
+import { useMemo, useState, useCallback, useEffect, memo } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { getTrendingSolana, getMemecoinsSolana, type DSPair } from "@/server/solana";
 import { ageFromMs, compact, fmtPct, fmtUsd, pctClass } from "@/lib/format";
 import {
-  Flame, Sparkles, Rocket, BarChart3, Coins, Star, StarOff,
-  ShieldCheck, ShieldAlert, AlertTriangle, ArrowUpDown, Search,
-  TrendingUp, TrendingDown, Zap, Eye,
+  Flame,
+  Sparkles,
+  Rocket,
+  BarChart3,
+  Coins,
+  Star,
+  StarOff,
+  ShieldCheck,
+  ShieldAlert,
+  AlertTriangle,
+  ArrowUpDown,
+  Search,
+  TrendingUp,
+  TrendingDown,
+  Zap,
+  Eye,
 } from "lucide-react";
 
 type Tab = "trending" | "memes" | "watchlist";
 type SortKey = "default" | "gainers" | "losers" | "volume" | "liquidity" | "new" | "mcap";
+const WATCHLIST_STORAGE_KEY = "blade:discover-watchlist";
+
+function loadWatchlist(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
 
 // ─── Mini sparkline (SVG) ─────────────────────────────────────────
 const Sparkline = memo(({ positive }: { positive: boolean }) => {
@@ -25,32 +50,46 @@ const Sparkline = memo(({ positive }: { positive: boolean }) => {
     return arr;
   }, [positive]);
 
-  const w = 80, h = 28;
-  const min = Math.min(...pts), max = Math.max(...pts);
+  const w = 80,
+    h = 28;
+  const min = Math.min(...pts),
+    max = Math.max(...pts);
   const range = max - min || 1;
   const path = pts
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${(i / (pts.length - 1)) * w} ${h - ((p - min) / range) * h}`)
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"} ${(i / (pts.length - 1)) * w} ${h - ((p - min) / range) * h}`,
+    )
     .join(" ");
 
   return (
     <svg width={w} height={h} className="overflow-visible">
-      <path d={path} fill="none" stroke={positive ? "#10b981" : "#ef4444"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={path}
+        fill="none"
+        stroke={positive ? "#10b981" : "#ef4444"}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 });
 
 // ─── Risk Badge ───────────────────────────────────────────────────
 function RiskBadge({ score }: { score: number }) {
-  if (score >= 75) return (
-    <span className="flex items-center gap-0.5 rounded-sm border border-bull/20 bg-bull/10 px-1 py-0.5 text-[8px] font-bold uppercase text-bull">
-      <ShieldCheck className="h-2 w-2" /> Safe
-    </span>
-  );
-  if (score >= 50) return (
-    <span className="flex items-center gap-0.5 rounded-sm border border-amber-500/20 bg-amber-500/10 px-1 py-0.5 text-[8px] font-bold uppercase text-amber-400">
-      <AlertTriangle className="h-2 w-2" /> Medium
-    </span>
-  );
+  if (score >= 75)
+    return (
+      <span className="flex items-center gap-0.5 rounded-sm border border-bull/20 bg-bull/10 px-1 py-0.5 text-[8px] font-bold uppercase text-bull">
+        <ShieldCheck className="h-2 w-2" /> Safe
+      </span>
+    );
+  if (score >= 50)
+    return (
+      <span className="flex items-center gap-0.5 rounded-sm border border-amber-500/20 bg-amber-500/10 px-1 py-0.5 text-[8px] font-bold uppercase text-amber-400">
+        <AlertTriangle className="h-2 w-2" /> Medium
+      </span>
+    );
   return (
     <span className="flex items-center gap-0.5 rounded-sm border border-bear/20 bg-bear/10 px-1 py-0.5 text-[8px] font-bold uppercase text-bear">
       <ShieldAlert className="h-2 w-2" /> High Risk
@@ -68,7 +107,7 @@ export function DiscoverPage() {
   const [tab, setTab] = useState<Tab>("trending");
   const [sort, setSort] = useState<SortKey>("default");
   const [q, setQ] = useState("");
-  const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
+  const [watchlist, setWatchlist] = useState<Set<string>>(() => loadWatchlist());
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
 
   const trendingQ = useQuery({
@@ -85,16 +124,26 @@ export function DiscoverPage() {
     enabled: tab === "memes",
   });
 
-  const baseData = tab === "trending" ? trendingQ.data : tab === "memes" ? memesQ.data : trendingQ.data;
-  const isLoading = (tab === "trending" ? trendingQ.isLoading : tab === "memes" ? memesQ.isLoading : false);
+  const baseData =
+    tab === "trending" ? trendingQ.data : tab === "memes" ? memesQ.data : trendingQ.data;
+  const isLoading =
+    tab === "trending" ? trendingQ.isLoading : tab === "memes" ? memesQ.isLoading : false;
 
   const toggleWatchlist = useCallback((addr: string) => {
     setWatchlist((prev) => {
       const next = new Set(prev);
-      next.has(addr) ? next.delete(addr) : next.add(addr);
+      if (next.has(addr)) {
+        next.delete(addr);
+      } else {
+        next.add(addr);
+      }
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify([...watchlist]));
+  }, [watchlist]);
 
   const rows = useMemo(() => {
     let list: DSPair[] = baseData ?? [];
@@ -111,20 +160,37 @@ export function DiscoverPage() {
         (p) =>
           p.baseToken.symbol.toLowerCase().includes(needle) ||
           p.baseToken.name?.toLowerCase().includes(needle) ||
-          p.baseToken.address.toLowerCase().includes(needle)
+          p.baseToken.address.toLowerCase().includes(needle),
       );
     }
 
     switch (sort) {
-      case "gainers": return [...list].sort((a, b) => (b.priceChange?.h24 ?? 0) - (a.priceChange?.h24 ?? 0));
-      case "losers": return [...list].sort((a, b) => (a.priceChange?.h24 ?? 0) - (b.priceChange?.h24 ?? 0));
-      case "volume": return [...list].sort((a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0));
-      case "liquidity": return [...list].sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0));
-      case "new": return [...list].sort((a, b) => (b.pairCreatedAt ?? 0) - (a.pairCreatedAt ?? 0));
-      case "mcap": return [...list].sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0));
-      default: return list;
+      case "gainers":
+        return [...list].sort((a, b) => (b.priceChange?.h24 ?? 0) - (a.priceChange?.h24 ?? 0));
+      case "losers":
+        return [...list].sort((a, b) => (a.priceChange?.h24 ?? 0) - (b.priceChange?.h24 ?? 0));
+      case "volume":
+        return [...list].sort((a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0));
+      case "liquidity":
+        return [...list].sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0));
+      case "new":
+        return [...list].sort((a, b) => (b.pairCreatedAt ?? 0) - (a.pairCreatedAt ?? 0));
+      case "mcap":
+        return [...list].sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0));
+      default:
+        return list;
     }
-  }, [baseData, trendingQ.data, q, sort, tab, watchlist]);
+  }, [baseData, memesQ.data, trendingQ.data, q, sort, tab, watchlist]);
+
+  const watchlistStats = useMemo(() => {
+    const allPairs = [...(trendingQ.data ?? []), ...(memesQ.data ?? [])];
+    const watched = Array.from(
+      new Map(allPairs.map((p) => [p.baseToken.address, p])).values(),
+    ).filter((p) => watchlist.has(p.baseToken.address));
+    const totalLiquidity = watched.reduce((acc, p) => acc + (p.liquidity?.usd ?? 0), 0);
+    const totalVolume = watched.reduce((acc, p) => acc + (p.volume?.h24 ?? 0), 0);
+    return { watched, totalLiquidity, totalVolume };
+  }, [memesQ.data, trendingQ.data, watchlist]);
 
   const SortButton = ({ id, label }: { id: SortKey; label: string }) => (
     <button
@@ -169,7 +235,9 @@ export function DiscoverPage() {
                   key={mode}
                   onClick={() => setViewMode(mode)}
                   className={`px-3 py-2 text-[10px] font-bold uppercase transition-none ${
-                    viewMode === mode ? "bg-neutral-800 text-white" : "bg-[#0a0a0a] text-neutral-600 hover:text-white"
+                    viewMode === mode
+                      ? "bg-neutral-800 text-white"
+                      : "bg-[#0a0a0a] text-neutral-600 hover:text-white"
                   }`}
                 >
                   {mode === "table" ? "≡" : "⊞"}
@@ -181,11 +249,13 @@ export function DiscoverPage() {
 
         {/* ── Tabs ────────────────────────────────────────────── */}
         <div className="mb-4 flex items-center gap-0 rounded-sm border border-neutral-800 bg-black overflow-hidden w-fit">
-          {([
-            { id: "trending", label: "Trending", icon: Flame },
-            { id: "memes", label: "Memes", icon: Coins },
-            { id: "watchlist", label: `Watchlist (${watchlist.size})`, icon: Star },
-          ] as const).map((t) => (
+          {(
+            [
+              { id: "trending", label: "Trending", icon: Flame },
+              { id: "memes", label: "Memes", icon: Coins },
+              { id: "watchlist", label: `Watchlist (${watchlist.size})`, icon: Star },
+            ] as const
+          ).map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id as Tab)}
@@ -216,10 +286,17 @@ export function DiscoverPage() {
               ✕ Clear
             </button>
           )}
-          <span className="ml-auto text-[9px] text-neutral-700 font-mono">
-            {rows.length} pairs
-          </span>
+          <span className="ml-auto text-[9px] text-neutral-700 font-mono">{rows.length} pairs</span>
         </div>
+
+        {watchlist.size > 0 && (
+          <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <WatchStat label="Saved" value={watchlist.size.toString()} />
+            <WatchStat label="Loaded" value={watchlistStats.watched.length.toString()} />
+            <WatchStat label="24h Volume" value={"$" + compact(watchlistStats.totalVolume)} />
+            <WatchStat label="Liquidity" value={"$" + compact(watchlistStats.totalLiquidity)} />
+          </div>
+        )}
 
         {/* ── Table View ──────────────────────────────────────── */}
         {viewMode === "table" && (
@@ -265,9 +342,13 @@ export function DiscoverPage() {
                         <td className="px-3 py-2.5">
                           <button
                             onClick={() => toggleWatchlist(p.baseToken.address)}
+                            aria-label={isWatched ? "Remove from watchlist" : "Add to watchlist"}
                             className={`transition-none ${isWatched ? "text-amber-400" : "text-neutral-800 group-hover:text-neutral-600"}`}
                           >
-                            <Star className="h-3.5 w-3.5" fill={isWatched ? "currentColor" : "none"} />
+                            <Star
+                              className="h-3.5 w-3.5"
+                              fill={isWatched ? "currentColor" : "none"}
+                            />
                           </button>
                         </td>
                         <td className="px-4 py-2.5 font-mono text-neutral-600">{idx + 1}</td>
@@ -279,7 +360,12 @@ export function DiscoverPage() {
                             className="flex items-center gap-3"
                           >
                             {p.info?.imageUrl ? (
-                              <img src={p.info.imageUrl} alt="" className="h-7 w-7 rounded-sm bg-neutral-900 object-cover shrink-0" loading="lazy" />
+                              <img
+                                src={p.info.imageUrl}
+                                alt=""
+                                className="h-7 w-7 rounded-sm bg-neutral-900 object-cover shrink-0"
+                                loading="lazy"
+                              />
                             ) : (
                               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-violet/15 text-[9px] font-bold text-violet border border-violet/20">
                                 {p.baseToken.symbol.slice(0, 3)}
@@ -287,21 +373,31 @@ export function DiscoverPage() {
                             )}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-semibold text-white">{p.baseToken.symbol}</span>
+                                <span className="font-semibold text-white">
+                                  {p.baseToken.symbol}
+                                </span>
                                 <span className="hidden truncate text-[9px] text-neutral-600 md:block">
                                   {p.baseToken.name}
                                 </span>
                               </div>
-                              <div className="text-[9px] text-neutral-700 uppercase tracking-wider">{p.dexId}</div>
+                              <div className="text-[9px] text-neutral-700 uppercase tracking-wider">
+                                {p.dexId}
+                              </div>
                             </div>
                           </Link>
                         </td>
-                        <td className="px-4 py-2.5 text-right"><RiskBadge score={riskScore} /></td>
+                        <td className="px-4 py-2.5 text-right">
+                          <RiskBadge score={riskScore} />
+                        </td>
                         <td className="px-4 py-2.5 text-right font-mono text-white">
                           {p.priceUsd ? fmtUsd(parseFloat(p.priceUsd)) : "—"}
                         </td>
-                        <td className={"px-4 py-2.5 text-right font-mono " + pctClass(ch1)}>{fmtPct(ch1)}</td>
-                        <td className={"px-4 py-2.5 text-right font-mono " + pctClass(ch24)}>{fmtPct(ch24)}</td>
+                        <td className={"px-4 py-2.5 text-right font-mono " + pctClass(ch1)}>
+                          {fmtPct(ch1)}
+                        </td>
+                        <td className={"px-4 py-2.5 text-right font-mono " + pctClass(ch24)}>
+                          {fmtPct(ch24)}
+                        </td>
                         <td className="px-4 py-2.5 text-right font-mono text-neutral-300">
                           {p.volume?.h24 ? "$" + compact(p.volume.h24) : "—"}
                         </td>
@@ -309,7 +405,11 @@ export function DiscoverPage() {
                           {p.liquidity?.usd ? "$" + compact(p.liquidity.usd) : "—"}
                         </td>
                         <td className="px-4 py-2.5 text-right font-mono text-neutral-300">
-                          {p.marketCap ? "$" + compact(p.marketCap) : p.fdv ? "$" + compact(p.fdv) : "—"}
+                          {p.marketCap
+                            ? "$" + compact(p.marketCap)
+                            : p.fdv
+                              ? "$" + compact(p.fdv)
+                              : "—"}
                         </td>
                         <td className="px-4 py-2.5 text-right font-mono text-neutral-600">
                           {ageFromMs(p.pairCreatedAt)}
@@ -325,8 +425,13 @@ export function DiscoverPage() {
                   })}
                   {!isLoading && rows.length === 0 && (
                     <tr>
-                      <td colSpan={12} className="px-4 py-16 text-center text-[11px] uppercase tracking-widest text-neutral-700">
-                        {tab === "watchlist" ? "No tokens in watchlist. Star tokens to track them." : "No tokens match your filter."}
+                      <td
+                        colSpan={12}
+                        className="px-4 py-16 text-center text-[11px] uppercase tracking-widest text-neutral-700"
+                      >
+                        {tab === "watchlist"
+                          ? "No tokens in watchlist. Star tokens to track them."
+                          : "No tokens match your filter."}
                       </td>
                     </tr>
                   )}
@@ -341,17 +446,24 @@ export function DiscoverPage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {isLoading &&
               Array.from({ length: 15 }).map((_, i) => (
-                <div key={i} className="h-32 animate-pulse rounded-sm border border-neutral-900 bg-neutral-900" />
+                <div
+                  key={i}
+                  className="h-32 animate-pulse rounded-sm border border-neutral-900 bg-neutral-900"
+                />
               ))}
             {rows.map((p) => {
               const ch24 = p.priceChange?.h24 ?? null;
               const isWatched = watchlist.has(p.baseToken.address);
               const riskScore = mockRiskScore(p.baseToken.symbol);
               return (
-                <div key={p.pairAddress} className="group relative rounded-sm border border-neutral-800 bg-[#0a0a0a] p-3 hover:border-neutral-600 transition-none">
+                <div
+                  key={p.pairAddress}
+                  className="group relative rounded-sm border border-neutral-800 bg-[#0a0a0a] p-3 hover:border-neutral-600 transition-none"
+                >
                   {/* Star */}
                   <button
                     onClick={() => toggleWatchlist(p.baseToken.address)}
+                    aria-label={isWatched ? "Remove from watchlist" : "Add to watchlist"}
                     className={`absolute right-2 top-2 transition-none ${isWatched ? "text-amber-400" : "text-neutral-800 group-hover:text-neutral-600"}`}
                   >
                     <Star className="h-3.5 w-3.5" fill={isWatched ? "currentColor" : "none"} />
@@ -359,14 +471,20 @@ export function DiscoverPage() {
                   <Link to="/token/$mint" params={{ mint: p.baseToken.address }}>
                     <div className="flex items-center gap-2 mb-3">
                       {p.info?.imageUrl ? (
-                        <img src={p.info.imageUrl} alt="" className="h-8 w-8 rounded-sm object-cover" />
+                        <img
+                          src={p.info.imageUrl}
+                          alt=""
+                          className="h-8 w-8 rounded-sm object-cover"
+                        />
                       ) : (
                         <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-violet/15 text-[9px] font-bold text-violet border border-violet/20">
                           {p.baseToken.symbol.slice(0, 3)}
                         </div>
                       )}
                       <div>
-                        <div className="font-semibold text-[12px] text-white">{p.baseToken.symbol}</div>
+                        <div className="font-semibold text-[12px] text-white">
+                          {p.baseToken.symbol}
+                        </div>
                         <RiskBadge score={riskScore} />
                       </div>
                     </div>
@@ -390,5 +508,14 @@ export function DiscoverPage() {
         )}
       </div>
     </AppLayout>
+  );
+}
+
+function WatchStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-sm border border-neutral-800 bg-[#0a0a0a] px-3 py-2">
+      <div className="text-[9px] uppercase tracking-widest text-neutral-600">{label}</div>
+      <div className="mt-0.5 font-mono text-[13px] font-semibold text-white">{value}</div>
+    </div>
   );
 }
