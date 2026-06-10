@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { getWalletHoldings, getTokensInfo } from "@/server/solana";
 import { compact, fmtUsd, shortAddr } from "@/lib/format";
-import { Wallet, Search } from "lucide-react";
+import { Wallet, Search, AlertTriangle, ShieldCheck, PieChart } from "lucide-react";
 
 export function PortfolioPage() {
   const [input, setInput] = useState("");
@@ -44,9 +44,12 @@ export function PortfolioPage() {
     }
   }
 
-  const SOL_PRICE = (pairs ?? []).find(
-    (p) => p.baseToken.symbol === "SOL" || p.baseToken.address === "So11111111111111111111111111111111111111112"
-  )?.priceUsd ?? null;
+  const SOL_PRICE =
+    (pairs ?? []).find(
+      (p) =>
+        p.baseToken.symbol === "SOL" ||
+        p.baseToken.address === "So11111111111111111111111111111111111111112",
+    )?.priceUsd ?? null;
 
   const enriched = (holdings?.tokens ?? [])
     .map((t) => {
@@ -59,6 +62,26 @@ export function PortfolioPage() {
   const tokensValue = enriched.reduce((acc, t) => acc + (t.value || 0), 0);
   const solValue = SOL_PRICE && holdings ? parseFloat(SOL_PRICE) * holdings.solBalance : 0;
   const total = tokensValue + solValue;
+  const pricedRows = enriched.filter((t) => t.value > 0);
+  const topHolding = pricedRows[0];
+  const topAllocation = total > 0 && topHolding ? (topHolding.value / total) * 100 : 0;
+  const stableValue = enriched
+    .filter((t) => ["USDC", "USDT", "USDH", "PYUSD"].includes(t.symbol ?? ""))
+    .reduce((acc, t) => acc + (t.value || 0), 0);
+  const stableAllocation = total > 0 ? (stableValue / total) * 100 : 0;
+  const unknownCount = (holdings?.tokens ?? []).filter((t) => !priceMap.has(t.mint)).length;
+  const portfolioScore = Math.max(
+    0,
+    Math.min(
+      100,
+      92 -
+        Math.max(0, topAllocation - 35) * 0.7 -
+        Math.max(0, unknownCount - 3) * 3 -
+        (stableAllocation < 5 && total > 500 ? 8 : 0),
+    ),
+  );
+  const riskLabel =
+    portfolioScore >= 75 ? "Balanced" : portfolioScore >= 55 ? "Watch" : "Concentrated";
 
   return (
     <AppLayout>
@@ -137,6 +160,66 @@ export function PortfolioPage() {
                     label="SPL Tokens"
                     value={(holdings?.tokens?.length ?? 0).toLocaleString()}
                   />
+                </div>
+
+                <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_1fr]">
+                  <DiagnosticCard
+                    icon={portfolioScore >= 75 ? ShieldCheck : AlertTriangle}
+                    label="Portfolio Health"
+                    value={riskLabel}
+                    tone={portfolioScore >= 75 ? "bull" : portfolioScore >= 55 ? "warn" : "bear"}
+                    detail={`${portfolioScore.toFixed(0)}/100 score`}
+                  />
+                  <DiagnosticCard
+                    icon={PieChart}
+                    label="Largest Position"
+                    value={topHolding?.symbol ?? "—"}
+                    tone={topAllocation > 50 ? "bear" : topAllocation > 35 ? "warn" : "bull"}
+                    detail={
+                      topHolding
+                        ? `${topAllocation.toFixed(1)}% of priced value`
+                        : "No priced tokens"
+                    }
+                  />
+                  <DiagnosticCard
+                    icon={ShieldCheck}
+                    label="Stable Buffer"
+                    value={`${stableAllocation.toFixed(1)}%`}
+                    tone={stableAllocation >= 10 ? "bull" : stableAllocation >= 5 ? "warn" : "bear"}
+                    detail={`${unknownCount} unpriced token${unknownCount === 1 ? "" : "s"}`}
+                  />
+                </div>
+
+                <div className="mt-3 rounded-xl border border-border bg-surface/40 p-4 shadow-card">
+                  <div className="mb-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Rebalance Notes
+                  </div>
+                  <div className="grid gap-2 text-sm text-muted-foreground md:grid-cols-3">
+                    <Note
+                      active={topAllocation > 40}
+                      text={
+                        topAllocation > 40
+                          ? `${topHolding?.symbol ?? "Top token"} is above 40% allocation.`
+                          : "No single priced token dominates the wallet."
+                      }
+                    />
+                    <Note
+                      active={stableAllocation < 5 && total > 500}
+                      text={
+                        stableAllocation < 5 && total > 500
+                          ? "Stable exposure is thin for volatile rotations."
+                          : "Stablecoin buffer is within the tracked range."
+                      }
+                    />
+                    <Note
+                      active={unknownCount > 3}
+                      text={
+                        unknownCount > 3
+                          ? "Several tokens do not have DexScreener pricing."
+                          : "Most tracked holdings have live price data."
+                      }
+                    />
+                  </div>
                 </div>
 
                 {/* Holdings table */}
@@ -242,6 +325,43 @@ export function PortfolioPage() {
         )}
       </div>
     </AppLayout>
+  );
+}
+
+function DiagnosticCard({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  icon: typeof ShieldCheck;
+  label: string;
+  value: string;
+  detail: string;
+  tone: "bull" | "warn" | "bear";
+}) {
+  const toneClass = tone === "bull" ? "text-bull" : tone === "warn" ? "text-chart-4" : "text-bear";
+  return (
+    <div className="rounded-xl border border-border bg-surface/40 p-4 shadow-card">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+        <Icon className={"h-4 w-4 " + toneClass} />
+      </div>
+      <div className={"mt-2 font-mono text-xl font-semibold " + toneClass}>{value}</div>
+      <div className="mt-1 text-[12px] text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+function Note({ active, text }: { active: boolean; text: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/40 p-3">
+      <span
+        className={"mt-1 h-1.5 w-1.5 shrink-0 rounded-full " + (active ? "bg-chart-4" : "bg-bull")}
+      />
+      <span>{text}</span>
+    </div>
   );
 }
 
