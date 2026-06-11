@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
+import { compact, fmtUsd } from "@/lib/format";
 
 type Opp = {
   protocol: string;
@@ -128,10 +129,25 @@ const OPPS: Opp[] = [
 export function YieldPage() {
   const [risk, setRisk] = useState<RiskFilter>("All");
   const [type, setType] = useState<TypeFilter>("All");
+  const [amount, setAmount] = useState(10_000);
+  const [days, setDays] = useState(30);
 
   const list = OPPS.filter(
     (o) => (risk === "All" || o.risk === risk) && (type === "All" || o.type === type),
   ).sort((a, b) => b.apy - a.apy);
+  const best = list[0];
+  const conservative = [...list].filter((o) => o.risk !== "High").sort((a, b) => b.apy - a.apy)[0];
+  const plannerRows = [
+    best,
+    conservative,
+    ...list.filter((o) => o.protocol !== best?.protocol).slice(0, 2),
+  ]
+    .filter(Boolean)
+    .filter(
+      (o, index, arr) =>
+        arr.findIndex((item) => item?.protocol === o?.protocol && item?.asset === o?.asset) ===
+        index,
+    ) as Opp[];
 
   return (
     <AppLayout>
@@ -156,6 +172,73 @@ export function YieldPage() {
             value={type}
             onChange={(v) => setType(v as TypeFilter)}
           />
+        </div>
+
+        <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-[360px_1fr]">
+          <div className="rounded-xl border border-border bg-surface/40 p-4 shadow-card">
+            <div className="mb-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+              Earnings Planner
+            </div>
+            <label className="block text-[12px] text-muted-foreground">
+              Deposit amount
+              <input
+                type="number"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(Number(e.target.value))}
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 font-mono text-sm text-foreground outline-none focus:border-violet"
+              />
+            </label>
+            <label className="mt-3 block text-[12px] text-muted-foreground">
+              Time horizon
+              <div className="mt-1 flex overflow-hidden rounded-lg border border-border bg-background">
+                {[7, 30, 90, 365].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDays(d)}
+                    className={
+                      "h-10 flex-1 font-mono text-[12px] transition-colors " +
+                      (days === d
+                        ? "bg-violet/20 text-foreground"
+                        : "text-muted-foreground hover:text-foreground")
+                    }
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+            </label>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-border bg-surface/40 shadow-card">
+            <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr] border-b border-border bg-surface/80 px-4 py-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <span>Strategy</span>
+              <span className="text-right">APY</span>
+              <span className="text-right">Projected</span>
+              <span className="text-right">TVL</span>
+            </div>
+            {plannerRows.map((o) => {
+              const projected = projectedYield(amount, o.apy, days);
+              return (
+                <div
+                  key={o.protocol + o.asset + "planner"}
+                  className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr] items-center border-b border-border/40 px-4 py-3 text-sm last:border-b-0"
+                >
+                  <div>
+                    <div className="font-semibold">{o.protocol}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {o.asset} · {o.risk} risk
+                    </div>
+                  </div>
+                  <div className="text-right font-mono text-bull">{o.apy.toFixed(2)}%</div>
+                  <div className="text-right font-mono">{fmtUsd(projected)}</div>
+                  <div className="text-right font-mono text-muted-foreground">
+                    ${compact(o.tvl)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -205,7 +288,7 @@ export function YieldPage() {
                 </span>
               </div>
               <button className="mt-4 h-9 w-full rounded-lg border border-border bg-surface-2 text-[12px] font-semibold transition-colors hover:bg-violet/15 hover:text-foreground">
-                Deposit
+                Deposit · {fmtUsd(projectedYield(amount, o.apy, days))}
               </button>
             </div>
           ))}
@@ -213,6 +296,13 @@ export function YieldPage() {
       </div>
     </AppLayout>
   );
+}
+
+function projectedYield(amount: number, apy: number, days: number): number {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  const periods = Math.max(1, days / 30);
+  const monthlyRate = apy / 100 / 12;
+  return amount * Math.pow(1 + monthlyRate, periods) - amount;
 }
 
 function Group({
