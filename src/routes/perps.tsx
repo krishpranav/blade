@@ -18,6 +18,8 @@ export function PerpsPage() {
   const [side, setSide] = useState<"long" | "short">("long");
   const [lev, setLev] = useState(10);
   const [size, setSize] = useState("100");
+  const [takeProfitPct, setTakeProfitPct] = useState(18);
+  const [stopLossPct, setStopLossPct] = useState(8);
 
   const orderbook = useMemo(() => {
     const mid = market.price;
@@ -32,6 +34,42 @@ export function PerpsPage() {
     }));
     return { bids, asks, mid };
   }, [market]);
+
+  const risk = useMemo(() => {
+    const margin = Math.max(0, parseFloat(size || "0") || 0);
+    const notional = margin * lev;
+    const entry = market.price;
+    const liquidation = entry * (side === "long" ? 1 - 1 / lev : 1 + 1 / lev);
+    const liqMovePct = Math.abs(((liquidation - entry) / entry) * 100);
+    const fee = notional * 0.0006;
+    const tpPrice = entry * (side === "long" ? 1 + takeProfitPct / 100 : 1 - takeProfitPct / 100);
+    const slPrice = entry * (side === "long" ? 1 - stopLossPct / 100 : 1 + stopLossPct / 100);
+    const tpPnl = margin * (takeProfitPct / 100) * lev - fee;
+    const slPnl = -(margin * (stopLossPct / 100) * lev + fee);
+    const riskReward = stopLossPct > 0 ? takeProfitPct / stopLossPct : 0;
+    const health =
+      liqMovePct <= stopLossPct
+        ? "Liquidation before stop"
+        : riskReward >= 2
+          ? "Favorable"
+          : riskReward >= 1
+            ? "Balanced"
+            : "Poor payoff";
+    return {
+      margin,
+      notional,
+      entry,
+      liquidation,
+      liqMovePct,
+      fee,
+      tpPrice,
+      slPrice,
+      tpPnl,
+      slPnl,
+      riskReward,
+      health,
+    };
+  }, [lev, market.price, side, size, stopLossPct, takeProfitPct]);
 
   return (
     <AppLayout>
@@ -164,7 +202,7 @@ export function PerpsPage() {
             </div>
             <div className="space-y-4 p-4">
               <div>
-                <div className="mb-1 text-[11px] text-muted-foreground">Size (USD)</div>
+                <div className="mb-1 text-[11px] text-muted-foreground">Margin (USD)</div>
                 <input
                   value={size}
                   onChange={(e) => setSize(e.target.value)}
@@ -191,17 +229,50 @@ export function PerpsPage() {
                   <span>50x</span>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <PctInput
+                  label="Take profit"
+                  value={takeProfitPct}
+                  onChange={setTakeProfitPct}
+                  tone="bull"
+                />
+                <PctInput
+                  label="Stop loss"
+                  value={stopLossPct}
+                  onChange={setStopLossPct}
+                  tone="bear"
+                />
+              </div>
               <div className="space-y-1.5 rounded-lg border border-border bg-surface-2/60 p-3 text-[11px]">
-                <Row label="Entry" value={fmtUsd(market.price)} />
-                <Row
-                  label="Liq. price"
-                  value={fmtUsd(market.price * (side === "long" ? 1 - 1 / lev : 1 + 1 / lev))}
-                />
-                <Row label="Notional" value={"$" + compact(parseFloat(size || "0") * lev)} />
-                <Row
-                  label="Fee"
-                  value={"$" + (parseFloat(size || "0") * lev * 0.0006).toFixed(2)}
-                />
+                <Row label="Entry" value={fmtUsd(risk.entry)} />
+                <Row label="Notional" value={"$" + compact(risk.notional)} />
+                <Row label="Est. fee" value={fmtUsd(risk.fee)} />
+                <Row label="Liq. price" value={fmtUsd(risk.liquidation)} />
+                <Row label="Liq. buffer" value={risk.liqMovePct.toFixed(2) + "%"} />
+              </div>
+              <div className="rounded-lg border border-border bg-background/50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Risk preview
+                  </span>
+                  <span className={riskTone(risk.health)}>{risk.health}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <PreviewStat label="TP price" value={fmtUsd(risk.tpPrice)} tone="bull" />
+                  <PreviewStat label="SL price" value={fmtUsd(risk.slPrice)} tone="bear" />
+                  <PreviewStat label="TP PnL" value={fmtUsd(risk.tpPnl)} tone="bull" />
+                  <PreviewStat label="SL PnL" value={fmtUsd(risk.slPnl)} tone="bear" />
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                  <div
+                    className="h-full bg-violet-gradient"
+                    style={{ width: Math.min(100, risk.riskReward * 35) + "%" }}
+                  />
+                </div>
+                <div className="mt-1 flex justify-between font-mono text-[10px] text-muted-foreground">
+                  <span>R:R</span>
+                  <span>{risk.riskReward.toFixed(2)}x</span>
+                </div>
               </div>
               <button
                 disabled
@@ -218,6 +289,63 @@ export function PerpsPage() {
       </div>
     </AppLayout>
   );
+}
+
+function PctInput({
+  label,
+  value,
+  onChange,
+  tone,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  tone: "bull" | "bear";
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1 text-[11px] text-muted-foreground">{label}</div>
+      <div className="flex h-10 items-center rounded-lg border border-border bg-surface-2 px-2">
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={value}
+          onChange={(e) => onChange(Math.max(0, Number(e.target.value)))}
+          className={
+            "w-full bg-transparent font-mono text-sm outline-none " +
+            (tone === "bull" ? "text-bull" : "text-bear")
+          }
+        />
+        <span className="font-mono text-[11px] text-muted-foreground">%</span>
+      </div>
+    </label>
+  );
+}
+
+function PreviewStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "bull" | "bear";
+}) {
+  return (
+    <div className="rounded-md bg-surface-2/70 p-2">
+      <div className="text-muted-foreground">{label}</div>
+      <div className={"mt-0.5 font-mono " + (tone === "bull" ? "text-bull" : "text-bear")}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function riskTone(health: string): string {
+  if (health === "Favorable") return "font-mono text-[11px] text-bull";
+  if (health === "Liquidation before stop") return "font-mono text-[11px] text-bear";
+  return "font-mono text-[11px] text-chart-4";
 }
 
 function Row({ label, value }: { label: string; value: string }) {
