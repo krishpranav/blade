@@ -1,5 +1,15 @@
-import React, { useState, useCallback, memo } from "react";
-import { BookOpen, Plus, Tag, Trash2, CheckSquare, Edit3, Save, TrendingUp, TrendingDown } from "lucide-react";
+import React, { useState, useCallback, useMemo, memo } from "react";
+import {
+  BookOpen,
+  Plus,
+  Tag,
+  Trash2,
+  CheckSquare,
+  Edit3,
+  Save,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
 import { fmtUsd } from "@/lib/format";
 
 type TradeTag = "momentum" | "breakout" | "dca" | "snipe" | "reversal" | "degen";
@@ -34,6 +44,66 @@ function ago(ms: number) {
   const h = Math.floor(((Date.now() - ms) % 86400000) / 3600000);
   if (d > 0) return `${d}d ago`;
   return `${h}h ago`;
+}
+
+function fmtSignedUsd(value: number): string {
+  return `${value >= 0 ? "+" : ""}${fmtUsd(value)}`;
+}
+
+function AnalyticsCell({
+  label,
+  value,
+  positive,
+}: {
+  label: string;
+  value: string;
+  positive: boolean;
+}) {
+  return (
+    <div className="bg-[#0a0a0a] px-3 py-2">
+      <div className="text-[9px] uppercase tracking-widest text-neutral-600">{label}</div>
+      <div
+        className={`mt-0.5 font-mono text-[12px] font-bold ${positive ? "text-bull" : "text-bear"}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function TradeCallout({
+  label,
+  entry,
+  positive,
+}: {
+  label: string;
+  entry: JournalEntry | undefined;
+  positive: boolean;
+}) {
+  return (
+    <div className="rounded-sm border border-neutral-900 bg-[#0a0a0a] p-2">
+      <div className="text-[9px] uppercase tracking-widest text-neutral-600">{label} Trade</div>
+      {entry ? (
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate font-mono text-[12px] font-bold text-white">
+              {entry.tokenSymbol}
+            </div>
+            <div className="text-[10px] uppercase text-neutral-600">
+              {entry.direction} · {ago(entry.timestamp)}
+            </div>
+          </div>
+          <div
+            className={`font-mono text-[12px] font-bold ${positive ? "text-bull" : "text-bear"}`}
+          >
+            {fmtSignedUsd(entry.pnlUsd ?? 0)}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-1 text-[10px] text-neutral-700">No closed trades yet.</div>
+      )}
+    </div>
+  );
 }
 
 export const TradingJournal = memo(function TradingJournal({
@@ -97,7 +167,14 @@ export const TradingJournal = memo(function TradingJournal({
     };
     setEntries((prev) => [entry, ...prev]);
     setIsAdding(false);
-    setForm({ tokenSymbol: currentSymbol, entryPrice: "", sizeUsd: "", tags: [], notes: "", direction: "long" });
+    setForm({
+      tokenSymbol: currentSymbol,
+      entryPrice: "",
+      sizeUsd: "",
+      tags: [],
+      notes: "",
+      direction: "long",
+    });
   }, [form, currentSymbol]);
 
   const removeEntry = useCallback((id: string) => {
@@ -107,17 +184,54 @@ export const TradingJournal = memo(function TradingJournal({
   const toggleTag = useCallback((tag: TradeTag) => {
     setForm((prev) => ({
       ...prev,
-      tags: prev.tags.includes(tag)
-        ? prev.tags.filter((t) => t !== tag)
-        : [...prev.tags, tag],
+      tags: prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag],
     }));
   }, []);
 
   const visible = filterTag === "all" ? entries : entries.filter((e) => e.tags.includes(filterTag));
 
-  const totalPnl = entries.reduce((a, e) => a + (e.pnlUsd ?? 0), 0);
-  const wins = entries.filter((e) => (e.pnlUsd ?? 0) > 0).length;
-  const closed = entries.filter((e) => e.closed).length;
+  const analytics = useMemo(() => {
+    const closedEntries = entries.filter((e) => e.closed && e.pnlUsd !== undefined);
+    const winners = closedEntries.filter((e) => (e.pnlUsd ?? 0) > 0);
+    const losers = closedEntries.filter((e) => (e.pnlUsd ?? 0) < 0);
+    const totalPnl = closedEntries.reduce((a, e) => a + (e.pnlUsd ?? 0), 0);
+    const avgWin = winners.length
+      ? winners.reduce((a, e) => a + (e.pnlUsd ?? 0), 0) / winners.length
+      : 0;
+    const avgLoss = losers.length
+      ? losers.reduce((a, e) => a + Math.abs(e.pnlUsd ?? 0), 0) / losers.length
+      : 0;
+    const winRate = closedEntries.length ? winners.length / closedEntries.length : 0;
+    const expectancy = winRate * avgWin - (1 - winRate) * avgLoss;
+    const payoff = avgLoss > 0 ? avgWin / avgLoss : avgWin > 0 ? Infinity : 0;
+    const sorted = [...closedEntries].sort((a, b) => (b.pnlUsd ?? 0) - (a.pnlUsd ?? 0));
+    const tagStats = ALL_TAGS.map((tag) => {
+      const tagged = closedEntries.filter((e) => e.tags.includes(tag));
+      const pnl = tagged.reduce((a, e) => a + (e.pnlUsd ?? 0), 0);
+      const wins = tagged.filter((e) => (e.pnlUsd ?? 0) > 0).length;
+      return {
+        tag,
+        count: tagged.length,
+        pnl,
+        winRate: tagged.length ? (wins / tagged.length) * 100 : 0,
+      };
+    })
+      .filter((stat) => stat.count > 0)
+      .sort((a, b) => b.pnl - a.pnl);
+
+    return {
+      totalPnl,
+      wins: winners.length,
+      closed: closedEntries.length,
+      avgWin,
+      avgLoss,
+      expectancy,
+      payoff,
+      best: sorted[0],
+      worst: sorted[sorted.length - 1],
+      tagStats,
+    };
+  }, [entries]);
 
   return (
     <div className="rounded-sm border border-neutral-800 bg-[#0d0d0d] shadow-none">
@@ -141,21 +255,80 @@ export const TradingJournal = memo(function TradingJournal({
       <div className="grid grid-cols-3 divide-x divide-neutral-800 border-b border-neutral-800">
         <div className="px-3 py-2 bg-[#0a0a0a]">
           <div className="text-[9px] uppercase tracking-widest text-neutral-600">Net PnL</div>
-          <div className={`mt-0.5 font-mono text-[12px] font-bold ${totalPnl >= 0 ? "text-bull" : "text-bear"}`}>
-            {totalPnl >= 0 ? "+" : ""}{fmtUsd(totalPnl)}
+          <div
+            className={`mt-0.5 font-mono text-[12px] font-bold ${analytics.totalPnl >= 0 ? "text-bull" : "text-bear"}`}
+          >
+            {analytics.totalPnl >= 0 ? "+" : ""}
+            {fmtUsd(analytics.totalPnl)}
           </div>
         </div>
         <div className="px-3 py-2 bg-[#0a0a0a]">
           <div className="text-[9px] uppercase tracking-widest text-neutral-600">Win Rate</div>
           <div className="mt-0.5 font-mono text-[12px] font-semibold text-white">
-            {closed > 0 ? ((wins / closed) * 100).toFixed(0) : "—"}%
+            {analytics.closed > 0 ? ((analytics.wins / analytics.closed) * 100).toFixed(0) : "—"}%
           </div>
         </div>
         <div className="px-3 py-2 bg-[#0a0a0a]">
           <div className="text-[9px] uppercase tracking-widest text-neutral-600">Entries</div>
-          <div className="mt-0.5 font-mono text-[12px] font-semibold text-white">{entries.length}</div>
+          <div className="mt-0.5 font-mono text-[12px] font-semibold text-white">
+            {entries.length}
+          </div>
         </div>
       </div>
+
+      {/* Analytics */}
+      <div className="grid grid-cols-2 gap-px border-b border-neutral-800 bg-neutral-800 md:grid-cols-4">
+        <AnalyticsCell
+          label="Expectancy"
+          value={fmtSignedUsd(analytics.expectancy)}
+          positive={analytics.expectancy >= 0}
+        />
+        <AnalyticsCell label="Avg Win" value={fmtUsd(analytics.avgWin)} positive />
+        <AnalyticsCell label="Avg Loss" value={fmtUsd(analytics.avgLoss)} positive={false} />
+        <AnalyticsCell
+          label="Payoff"
+          value={Number.isFinite(analytics.payoff) ? analytics.payoff.toFixed(2) + "R" : "∞R"}
+          positive={analytics.payoff >= 1}
+        />
+      </div>
+
+      {(analytics.best || analytics.tagStats.length > 0) && (
+        <div className="border-b border-neutral-800 bg-black p-3">
+          <div className="grid gap-2 md:grid-cols-[1fr_1fr_1.4fr]">
+            <TradeCallout label="Best" entry={analytics.best} positive />
+            <TradeCallout label="Worst" entry={analytics.worst} positive={false} />
+            <div className="rounded-sm border border-neutral-900 bg-[#0a0a0a] p-2">
+              <div className="mb-2 text-[9px] uppercase tracking-widest text-neutral-600">
+                Tag Edge
+              </div>
+              <div className="space-y-1">
+                {analytics.tagStats.slice(0, 3).map((stat) => (
+                  <div key={stat.tag} className="grid grid-cols-[1fr_48px_56px] items-center gap-2">
+                    <span
+                      className={`rounded-sm border px-1.5 py-0.5 text-[8px] font-bold uppercase ${TAG_COLORS[stat.tag]}`}
+                    >
+                      {stat.tag}
+                    </span>
+                    <span className="text-right font-mono text-[10px] text-neutral-500">
+                      {stat.winRate.toFixed(0)}%
+                    </span>
+                    <span
+                      className={`text-right font-mono text-[10px] ${stat.pnl >= 0 ? "text-bull" : "text-bear"}`}
+                    >
+                      {fmtSignedUsd(stat.pnl)}
+                    </span>
+                  </div>
+                ))}
+                {analytics.tagStats.length === 0 && (
+                  <div className="text-[10px] text-neutral-700">
+                    Close tagged trades to rank setups.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Form */}
       {isAdding && (
@@ -206,7 +379,9 @@ export const TradingJournal = memo(function TradingJournal({
                 key={tag}
                 onClick={() => toggleTag(tag)}
                 className={`rounded-sm border px-2 py-0.5 text-[9px] font-bold uppercase transition-none ${
-                  form.tags.includes(tag) ? TAG_COLORS[tag] : "border-neutral-800 text-neutral-700 hover:text-white"
+                  form.tags.includes(tag)
+                    ? TAG_COLORS[tag]
+                    : "border-neutral-800 text-neutral-700 hover:text-white"
                 }`}
               >
                 {tag}
@@ -261,12 +436,22 @@ export const TradingJournal = memo(function TradingJournal({
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[12px] font-bold text-white">{entry.tokenSymbol}</span>
-                  <span className={`flex items-center gap-0.5 rounded-sm border px-1 py-0.5 text-[8px] font-bold ${entry.direction === "long" ? "border-bull/20 bg-bull/10 text-bull" : "border-bear/20 bg-bear/10 text-bear"}`}>
-                    {entry.direction === "long" ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+                  <span className="font-mono text-[12px] font-bold text-white">
+                    {entry.tokenSymbol}
+                  </span>
+                  <span
+                    className={`flex items-center gap-0.5 rounded-sm border px-1 py-0.5 text-[8px] font-bold ${entry.direction === "long" ? "border-bull/20 bg-bull/10 text-bull" : "border-bear/20 bg-bear/10 text-bear"}`}
+                  >
+                    {entry.direction === "long" ? (
+                      <TrendingUp className="h-2.5 w-2.5" />
+                    ) : (
+                      <TrendingDown className="h-2.5 w-2.5" />
+                    )}
                     {entry.direction.toUpperCase()}
                   </span>
-                  <span className="text-[9px] text-neutral-700 font-mono">{ago(entry.timestamp)}</span>
+                  <span className="text-[9px] text-neutral-700 font-mono">
+                    {ago(entry.timestamp)}
+                  </span>
                 </div>
                 <div className="mt-1 flex items-center gap-3 text-[10px] font-mono text-neutral-500">
                   <span>Entry: ${entry.entryPrice.toFixed(6)}</span>
@@ -276,22 +461,33 @@ export const TradingJournal = memo(function TradingJournal({
               </div>
               <div className="flex items-center gap-3">
                 {entry.pnlUsd !== undefined && (
-                  <span className={`font-mono text-[12px] font-bold ${entry.pnlUsd >= 0 ? "text-bull" : "text-bear"}`}>
-                    {entry.pnlUsd >= 0 ? "+" : ""}{fmtUsd(entry.pnlUsd)}
+                  <span
+                    className={`font-mono text-[12px] font-bold ${entry.pnlUsd >= 0 ? "text-bull" : "text-bear"}`}
+                  >
+                    {entry.pnlUsd >= 0 ? "+" : ""}
+                    {fmtUsd(entry.pnlUsd)}
                   </span>
                 )}
-                <button onClick={() => removeEntry(entry.id)} className="text-neutral-800 hover:text-bear transition-none">
+                <button
+                  onClick={() => removeEntry(entry.id)}
+                  className="text-neutral-800 hover:text-bear transition-none"
+                >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
             {entry.notes && (
-              <p className="mt-2 text-[10px] italic text-neutral-600 leading-relaxed">{entry.notes}</p>
+              <p className="mt-2 text-[10px] italic text-neutral-600 leading-relaxed">
+                {entry.notes}
+              </p>
             )}
             {entry.tags.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {entry.tags.map((tag) => (
-                  <span key={tag} className={`rounded-sm border px-1.5 py-0.5 text-[8px] font-bold uppercase ${TAG_COLORS[tag]}`}>
+                  <span
+                    key={tag}
+                    className={`rounded-sm border px-1.5 py-0.5 text-[8px] font-bold uppercase ${TAG_COLORS[tag]}`}
+                  >
                     {tag}
                   </span>
                 ))}
