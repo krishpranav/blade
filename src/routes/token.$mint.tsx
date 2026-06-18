@@ -24,6 +24,7 @@ import { SocialSentimentFeed } from "@/components/SocialSentimentFeed";
 import { RiskCalculator } from "@/components/RiskCalculator";
 import { TradingJournal } from "@/components/TradingJournal";
 import { MarketOverviewBar } from "@/components/MarketOverviewBar";
+import { TokenIcon } from "@/components/TokenIcon";
 
 export function TokenPage() {
   const { mint } = useParams({ from: "/token/$mint" });
@@ -149,17 +150,7 @@ export function TokenPage() {
           {/* Center Column: Header + Stats + Chart */}
           <div className="flex flex-col gap-3 h-full contain-layout">
             <div className="flex flex-wrap items-center gap-4 rounded-sm border border-neutral-800 bg-black p-4 shadow-none">
-              {top.info?.imageUrl ? (
-                <img
-                  src={top.info.imageUrl}
-                  alt=""
-                  className="h-12 w-12 rounded-sm bg-[#1a1a1a] object-cover"
-                />
-              ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-violet/20 text-sm font-semibold text-violet">
-                  {top.baseToken.symbol.slice(0, 3)}
-                </div>
-              )}
+              <TokenIcon symbol={top.baseToken.symbol} imageUrl={top.info?.imageUrl} size="lg" />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="font-display text-xl font-semibold tracking-tight text-white">
@@ -205,7 +196,11 @@ export function TokenPage() {
             </div>
 
             <div className="flex h-[400px] flex-col overflow-hidden rounded-sm border border-neutral-800 bg-black shadow-none contain-strict relative">
-              <NativeChart width={800} height={400} />
+              <NativeChart
+                symbol={top.baseToken.symbol}
+                currentPriceUsd={price || 0.005}
+                changePct={ch24}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

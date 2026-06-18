@@ -1,4 +1,5 @@
-import React, { useMemo, useEffect, useState, memo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { compact, fmtUsd, pctClass } from "@/lib/format";
 
 type Candle = {
   time: number;
@@ -19,134 +20,201 @@ const TF_MS: Record<Timeframe, number> = {
   "4h": 14_400_000,
 };
 
-export const NativeChart = memo(function NativeChart({ width = 800, height = 400 }: { width?: number, height?: number }) {
-  const [candles, setCandles] = useState<Candle[]>([]);
+function hashSeed(value: string): number {
+  return value.split("").reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) >>> 0, 2166136261);
+}
+
+function seeded(seed: number) {
+  let state = seed || 1;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0xffffffff;
+  };
+}
+
+function makeCandles(symbol: string, basePrice: number, timeframe: Timeframe): Candle[] {
+  const rand = seeded(hashSeed(symbol + timeframe));
+  const now = Date.now();
+  const intervalMs = TF_MS[timeframe];
+  const count = 96;
+  const data: Candle[] = [];
+  let close = Math.max(basePrice, 0.00000001) * (0.94 + rand() * 0.1);
+
+  for (let i = count - 1; i >= 0; i--) {
+    const trend = Math.sin((count - i) / 9) * 0.004;
+    const shock = (rand() - 0.48) * 0.028;
+    const open = close;
+    close = Math.max(open * (1 + trend + shock), basePrice * 0.55);
+    const wick = open * (0.006 + rand() * 0.022);
+    const high = Math.max(open, close) + wick;
+    const low = Math.max(0, Math.min(open, close) - wick * (0.55 + rand()));
+    const volume = 12_000 + rand() * 95_000 + Math.abs(close - open) * 1_000_000;
+    data.push({ time: now - i * intervalMs, open, high, low, close, volume });
+  }
+
+  const last = data[data.length - 1];
+  const adjustment = basePrice / last.close;
+  return data.map((candle) => ({
+    ...candle,
+    open: candle.open * adjustment,
+    high: candle.high * adjustment,
+    low: candle.low * adjustment,
+    close: candle.close * adjustment,
+  }));
+}
+
+export const NativeChart = memo(function NativeChart({
+  symbol = "TOKEN",
+  currentPriceUsd = 0.005,
+  changePct,
+}: {
+  symbol?: string;
+  currentPriceUsd?: number;
+  changePct?: number | null;
+}) {
   const [timeframe, setTimeframe] = useState<Timeframe>("5m");
+  const [candles, setCandles] = useState<Candle[]>(() =>
+    makeCandles(symbol, currentPriceUsd, "5m"),
+  );
 
-  // Generate realistic mock OHLC data
   useEffect(() => {
-    let currentPrice = 0.005;
-    const data: Candle[] = [];
-    const now = Date.now();
-    const intervalMs = TF_MS[timeframe];
-    
-    for (let i = 100; i >= 0; i--) {
-      const volatility = currentPrice * 0.05;
-      const open = currentPrice;
-      const close = open + (Math.random() - 0.48) * volatility;
-      const high = Math.max(open, close) + Math.random() * volatility * 0.5;
-      const low = Math.min(open, close) - Math.random() * volatility * 0.5;
-      const volume = 10000 + Math.random() * 90000;
-      
-      data.push({
-        time: now - i * intervalMs,
-        open, high, low, close, volume
-      });
-      currentPrice = close;
-    }
-    setCandles(data);
+    setCandles(makeCandles(symbol, currentPriceUsd, timeframe));
+  }, [currentPriceUsd, symbol, timeframe]);
 
-    // Live tick simulation
+  useEffect(() => {
     const interval = setInterval(() => {
-      setCandles(prev => {
-        if (prev.length === 0) return prev;
+      setCandles((prev) => {
+        if (!prev.length) return prev;
         const last = prev[prev.length - 1];
-        const newClose = last.close + (Math.random() - 0.5) * last.close * 0.01;
-        const newHigh = Math.max(last.high, newClose);
-        const newLow = Math.min(last.low, newClose);
-        
-        const updatedLast = { ...last, close: newClose, high: newHigh, low: newLow };
-        return [...prev.slice(0, prev.length - 1), updatedLast];
+        const nextClose = last.close + (currentPriceUsd - last.close) * 0.35;
+        const updated = {
+          ...last,
+          close: nextClose,
+          high: Math.max(last.high, nextClose),
+          low: Math.min(last.low, nextClose),
+          volume: last.volume * 0.96 + 2_500,
+        };
+        return [...prev.slice(0, -1), updated];
       });
-    }, 1500);
-
+    }, 2500);
     return () => clearInterval(interval);
-  }, [timeframe]);
+  }, [currentPriceUsd]);
 
-  const { minPrice, maxPrice } = useMemo(() => {
-    if (candles.length === 0) return { minPrice: 0, maxPrice: 1 };
-    let min = Infinity, max = -Infinity;
-    candles.forEach(c => {
-      if (c.low < min) min = c.low;
-      if (c.high > max) max = c.high;
-    });
-    // Add 10% padding
-    const padding = (max - min) * 0.1;
-    return { minPrice: min - padding, maxPrice: max + padding };
-  }, [candles]);
+  const frame = useMemo(() => {
+    const min = Math.min(...candles.map((c) => c.low));
+    const max = Math.max(...candles.map((c) => c.high));
+    const range = max - min || max || 1;
+    const pad = range * 0.12;
+    const maxVolume = Math.max(...candles.map((c) => c.volume), 1);
+    const first = candles[0]?.open ?? currentPriceUsd;
+    const last = candles[candles.length - 1]?.close ?? currentPriceUsd;
+    return {
+      min: Math.max(0, min - pad),
+      max: max + pad,
+      maxVolume,
+      first,
+      last,
+      movePct: first > 0 ? ((last / first) - 1) * 100 : 0,
+    };
+  }, [candles, currentPriceUsd]);
 
-  const maxVolume = useMemo(() => candles.reduce((m, c) => Math.max(m, c.volume), 0), [candles]);
-
-  if (candles.length === 0) return <div className="h-full w-full bg-black flex items-center justify-center text-neutral-500 font-mono text-xs">LOADING CHART...</div>;
-
-  const candleWidth = width / Math.max(candles.length, 50);
-  // Reserve bottom 20% for volume
-  const chartHeight = height * 0.78;
-  const volHeight = height * 0.18;
-  const priceRange = maxPrice - minPrice || 1;
-
-  const getY = (price: number) => chartHeight - ((price - minPrice) / priceRange) * chartHeight;
+  const width = 960;
+  const height = 420;
+  const rightAxis = 72;
+  const topPad = 36;
+  const chartHeight = 292;
+  const volumeTop = 336;
+  const volumeHeight = 62;
+  const plotWidth = width - rightAxis - 12;
+  const priceRange = frame.max - frame.min || 1;
+  const candleSlot = plotWidth / candles.length;
+  const candleBody = Math.max(3, Math.min(8, candleSlot * 0.58));
+  const y = (price: number) => topPad + (1 - (price - frame.min) / priceRange) * chartHeight;
+  const lastY = y(frame.last);
+  const axisValues = [frame.max, frame.max - priceRange * 0.25, frame.max - priceRange * 0.5, frame.max - priceRange * 0.75, frame.min];
 
   return (
-    <div className="relative h-full w-full bg-[#050505] overflow-hidden group">
-      <div className="absolute top-2 left-3 z-10 flex gap-1.5">
+    <div className="relative h-full w-full overflow-hidden bg-[#050505]">
+      <div className="absolute left-3 top-2 z-20 flex items-center gap-1.5">
         {(["1m", "5m", "15m", "1h", "4h"] as Timeframe[]).map((tf) => (
           <button
             key={tf}
             onClick={() => setTimeframe(tf)}
             className={`rounded-sm border px-2 py-0.5 text-[9px] font-bold uppercase transition-none ${
               timeframe === tf
-                ? "bg-violet/20 border-violet/40 text-violet"
-                : "border-neutral-800 bg-black text-neutral-600 hover:text-white"
+                ? "border-violet/50 bg-violet/20 text-violet"
+                : "border-neutral-800 bg-black text-neutral-500 hover:text-white"
             }`}
           >
             {tf}
           </button>
         ))}
-        <div className="ml-2 rounded-sm border border-neutral-800 bg-black px-2 py-0.5 text-[9px] font-mono text-neutral-700">BLADE ENGINE</div>
       </div>
-      
-      {/* Grid Lines */}
-      <svg width="100%" height="100%" preserveAspectRatio="none" className="absolute inset-0 z-0">
-        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#111" strokeWidth="1" />
-        </pattern>
-        <rect width="100%" height="100%" fill="url(#grid)" />
-      </svg>
 
-      {/* Candlesticks + Volume Bars */}
-      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="absolute inset-0 z-10">
-        {/* Separator */}
-        <line x1={0} y1={chartHeight + 4} x2={width} y2={chartHeight + 4} stroke="#222" strokeWidth="1" />
-        {candles.map((candle, i) => {
+      <div className="absolute right-3 top-2 z-20 text-right">
+        <div className="font-mono text-[12px] font-semibold text-white">{fmtUsd(frame.last)}</div>
+        <div className={`font-mono text-[10px] ${pctClass(changePct ?? frame.movePct)}`}>
+          {(changePct ?? frame.movePct) >= 0 ? "+" : ""}
+          {(changePct ?? frame.movePct).toFixed(2)}%
+        </div>
+      </div>
+
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" preserveAspectRatio="none">
+        <rect x={0} y={0} width={width} height={height} fill="#050505" />
+
+        {axisValues.map((value) => (
+          <g key={value}>
+            <line x1={0} x2={plotWidth} y1={y(value)} y2={y(value)} stroke="#151515" strokeWidth={1} />
+            <text x={width - 10} y={y(value) + 3} textAnchor="end" fill="#737373" fontSize={10} fontFamily="monospace">
+              {fmtUsd(value)}
+            </text>
+          </g>
+        ))}
+
+        {Array.from({ length: 13 }).map((_, i) => {
+          const x = (plotWidth / 12) * i;
+          return <line key={i} x1={x} x2={x} y1={topPad} y2={volumeTop + volumeHeight} stroke="#111" strokeWidth={1} />;
+        })}
+
+        <line x1={0} x2={plotWidth} y1={volumeTop - 12} y2={volumeTop - 12} stroke="#242424" strokeWidth={1} />
+
+        {candles.map((candle, index) => {
           const isBull = candle.close >= candle.open;
-          const color = isBull ? "#10b981" : "#ef4444";
-          const x = i * candleWidth;
-          const yOpen = getY(candle.open);
-          const yClose = getY(candle.close);
-          const yHigh = getY(candle.high);
-          const yLow = getY(candle.low);
-          const rectY = Math.min(yOpen, yClose);
-          const rectH = Math.max(Math.abs(yOpen - yClose), 1);
-          // Volume bar
-          const volBarH = maxVolume > 0 ? (candle.volume / maxVolume) * volHeight : 0;
-          const volY = height - volBarH;
+          const color = isBull ? "#16c784" : "#ea3943";
+          const x = index * candleSlot + candleSlot / 2;
+          const openY = y(candle.open);
+          const closeY = y(candle.close);
+          const highY = y(candle.high);
+          const lowY = y(candle.low);
+          const bodyY = Math.min(openY, closeY);
+          const bodyH = Math.max(2, Math.abs(openY - closeY));
+          const volH = (candle.volume / frame.maxVolume) * volumeHeight;
           return (
             <g key={candle.time}>
-              <line x1={x + candleWidth / 2} y1={yHigh} x2={x + candleWidth / 2} y2={yLow} stroke={color} strokeWidth="1" />
-              <rect x={x + 1} y={rectY} width={candleWidth - 2} height={rectH} fill={color} />
-              {/* Volume */}
-              <rect x={x + 1} y={volY} width={candleWidth - 2} height={volBarH} fill={isBull ? "rgba(16,185,129,0.35)" : "rgba(239,68,68,0.35)"} />
+              <line x1={x} x2={x} y1={highY} y2={lowY} stroke={color} strokeWidth={1.2} />
+              <rect x={x - candleBody / 2} y={bodyY} width={candleBody} height={bodyH} rx={0.5} fill={color} />
+              <rect
+                x={x - candleBody / 2}
+                y={volumeTop + volumeHeight - volH}
+                width={candleBody}
+                height={volH}
+                fill={isBull ? "rgba(22,199,132,0.38)" : "rgba(234,57,67,0.32)"}
+              />
             </g>
           );
         })}
+
+        <line x1={0} x2={plotWidth} y1={lastY} y2={lastY} stroke="#f2d10a" strokeDasharray="4 4" strokeWidth={1} opacity={0.7} />
+        <rect x={plotWidth + 4} y={lastY - 9} width={rightAxis - 10} height={18} rx={2} fill="#f2d10a" />
+        <text x={width - 9} y={lastY + 4} textAnchor="end" fill="#111" fontSize={10} fontWeight={700} fontFamily="monospace">
+          {fmtUsd(frame.last)}
+        </text>
       </svg>
-      
-      {/* Price Axis Overlay (Mock) */}
-      <div className="absolute right-0 top-0 bottom-0 w-16 border-l border-neutral-800 bg-black/80 z-20 flex flex-col justify-between py-4 text-[9px] font-mono text-neutral-500">
-        <div className="text-right pr-2">{maxPrice.toFixed(5)}</div>
-        <div className="text-right pr-2">{((maxPrice + minPrice) / 2).toFixed(5)}</div>
-        <div className="text-right pr-2">{minPrice.toFixed(5)}</div>
+
+      <div className="absolute bottom-2 left-3 flex items-center gap-4 text-[10px] uppercase tracking-wider text-neutral-600">
+        <span>{symbol}</span>
+        <span>Vol {compact(candles[candles.length - 1]?.volume ?? 0)}</span>
+        <span>Native OHLC</span>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { fmtUsd } from "@/lib/format";
 import { getBackendExecutionTrace } from "@/server/solana";
+import { TokenIcon } from "./TokenIcon";
 
 export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
   const [inputMint, setInputMint] = useState(defaultInput);
@@ -163,8 +164,8 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
               onChange={(e) => setAmount(e.target.value)}
               className="w-full bg-transparent text-3xl font-semibold outline-none placeholder:text-muted-foreground/30"
             />
-            <div className="flex shrink-0 items-center gap-2 rounded-lg bg-surface px-3 py-1.5 font-semibold shadow-sm">
-              <div className="h-5 w-5 rounded-full bg-violet-gradient" />
+            <div className="flex shrink-0 items-center gap-2 rounded-sm border border-neutral-800 bg-[#111] px-3 py-1.5 font-semibold shadow-sm">
+              <TokenIcon symbol={inputMint} size="sm" />
               {inputMint}
             </div>
           </div>
@@ -199,8 +200,8 @@ export function SwapTerminal({ defaultInput = "SOL", defaultOutput = "BONK" }) {
                 "0.00"
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-2 rounded-sm bg-[#1a1a1a] px-3 py-1.5 font-semibold border border-neutral-800">
-              <div className="h-4 w-4 rounded-full bg-bull" />
+            <div className="flex shrink-0 items-center gap-2 rounded-sm border border-neutral-800 bg-[#1a1a1a] px-3 py-1.5 font-semibold">
+              <TokenIcon symbol={outputMint} size="sm" />
               {outputMint}
             </div>
           </div>

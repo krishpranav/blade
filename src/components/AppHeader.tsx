@@ -6,6 +6,7 @@ import { WalletButton } from "./WalletButton";
 import { getMarketStats, searchTokens } from "@/server/solana";
 import { fmtUsd } from "@/lib/format";
 import { Search } from "lucide-react";
+import { TokenIcon } from "./TokenIcon";
 
 const navItems = [
   { to: "/discover", label: "Discover" },
@@ -129,9 +130,7 @@ export function AppHeader() {
                   }}
                   className="flex w-full items-center gap-3 border-b border-border/40 px-4 py-3 text-left transition-colors hover:bg-surface-2"
                 >
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet/20 text-[10px] font-semibold">
-                    {p.baseToken.symbol.slice(0, 3)}
-                  </div>
+                  <TokenIcon symbol={p.baseToken.symbol} imageUrl={p.info?.imageUrl} size="sm" />
                   <div className="flex-1 min-w-0">
                     <div className="truncate text-sm font-semibold">
                       {p.baseToken.symbol}{" "}
